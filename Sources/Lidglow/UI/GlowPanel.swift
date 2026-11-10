@@ -3,17 +3,14 @@ import SwiftUI
 
 struct GlowPanel: View {
     @ObservedObject var model: GlowModel
-    private let accent = Color(red: 0.48, green: 0.91, blue: 0.85)
-
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack(spacing: 9) {
                 Image(systemName: "waveform.circle.fill")
-                    .font(.title2).foregroundStyle(accent)
+                    .font(.title2)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.primary)
                 Text("Lidglow").font(.headline)
-                Spacer()
-                Text("LID LIGHT").font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .tracking(2).foregroundStyle(.secondary)
             }
             LaptopPreview(level: model.mode == .system ? 0.65 : model.level,
                            isVisible: model.panelVisible)
@@ -25,17 +22,17 @@ struct GlowPanel: View {
                             Text(mode.rawValue).font(.system(size: 10, weight: .medium))
                         }
                         .frame(maxWidth: .infinity, minHeight: 46)
-                        .foregroundStyle(model.mode == mode ? accent : .secondary)
-                        .background(model.mode == mode ? accent.opacity(0.13) : Color.clear,
-                                    in: RoundedRectangle(cornerRadius: 8))
-                        .contentShape(Rectangle())
+                        .foregroundStyle(.primary)
+                        .background(model.mode == mode ? Color.primary.opacity(0.16) : .clear,
+                                    in: Capsule())
+                        .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(model.mode == mode ? .isSelected : [])
                 }
             }
             .padding(4)
-            .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 11))
+            .background(.primary.opacity(0.06), in: Capsule())
             if model.mode == .music || model.mode == .steady || model.mode == .breathe {
                 control("Brightness", value: $model.brightness, range: 0.05...1,
                         reading: "\(Int((model.brightness * 100).rounded()))%")
@@ -65,9 +62,8 @@ struct GlowPanel: View {
                     .buttonStyle(.link).font(.system(size: 11))
             }
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity)
-        .preferredColorScheme(.dark)
     }
 
     private func control(_ title: String, value: Binding<Double>, range: ClosedRange<Double>,
@@ -78,7 +74,7 @@ struct GlowPanel: View {
                 Spacer()
                 Text(reading).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
             }
-            Slider(value: value, in: range).tint(accent).accessibilityLabel(title)
+            Slider(value: value, in: range).accessibilityLabel(title)
         }
     }
 }

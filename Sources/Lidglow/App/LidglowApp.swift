@@ -50,14 +50,13 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             let host = NSHostingController(rootView: GlowPanel(model: model))
             host.sizingOptions = []
             let scroll = NSScrollView()
-            scroll.drawsBackground = true
-            scroll.backgroundColor = .windowBackgroundColor
+            scroll.drawsBackground = false
             scroll.hasVerticalScroller = true
             scroll.scrollerStyle = .overlay
             scroll.autohidesScrollers = true
             scroll.documentView = host.view
             let container = NSViewController()
-            container.view = scroll
+            container.view = MenuPanel.backdrop(containing: scroll)
             container.addChild(host)
 
             let panel = MenuPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
@@ -68,10 +67,6 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
             panel.hidesOnDeactivate = false
             panel.backgroundColor = .clear
-            panel.appearance = NSAppearance(named: .darkAqua)
-            panel.contentView?.wantsLayer = true
-            panel.contentView?.layer?.cornerRadius = 12
-            panel.contentView?.layer?.masksToBounds = true
             panel.isOpaque = false
             panel.hasShadow = true
             self.panel = panel
@@ -79,7 +74,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         }
         model.panelVisible = true
         guard positionPanel(), let panel else { model.panelVisible = false; return }
-        if let scroll = panel.contentView as? NSScrollView, let document = scroll.documentView {
+        if let scroll = host?.view.enclosingScrollView, let document = scroll.documentView {
             let top = document.isFlipped ? 0 : max(0, document.frame.height - scroll.contentView.bounds.height)
             scroll.contentView.scroll(to: NSPoint(x: 0, y: top))
             scroll.reflectScrolledClipView(scroll.contentView)
