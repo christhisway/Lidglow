@@ -12,6 +12,7 @@ final class LidLogo {
     private var settledTarget: Double?
     private var nextSettledCheck = 0.0
     private let settledRecheck = 0.5
+    var isSettled: Bool { settledTarget != nil }
     var onRiseFromDark: (() -> Void)?
 
     var available: Bool { bridge.mode >= 0 && bridge.level.isFinite }
