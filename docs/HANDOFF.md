@@ -4,7 +4,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 
 ## Current behavior
 
-- Lidglow starts in the menu bar and opens its controls only when the icon is clicked. The panel anchors below the status item, clamps to the active display’s visible frame, and expands down when Music controls appear. It scrolls when vertical space is limited.
+- Lidglow starts in the menu bar and opens its controls only when the icon is clicked. The panel anchors below the status item, clamps to the active display’s visible frame, and expands down when Music controls appear. It scrolls when vertical space is limited. Control-clicking or right-clicking the icon opens a context menu with Open Settings… and Quit Lidglow. The Settings window has no sections yet.
 - A switch in the panel's top-right corner turns Lidglow on or off. Off returns control to macOS (1.0's System mode, which migrates to the switch being off) and is the first-launch default. Modes are Standard, Breathe, and Music. Standard holds a fixed brightness, and zero brightness turns the logo off (this replaced 1.0's separate Off and Steady modes, which migrate to Standard). The switch, selected mode, brightness, sensitivity, and idle glow settings persist.
 - Music uses a private Core Audio process tap to meter system playback, with separate bass and drum transient detection. It uses no microphone, stores no recordings, and has no network code.
 - Idle glow sets a base between hits and tracks, capped at 90% of the chosen peak so beats can still brighten the logo. The preview and physical LED both glow white.
@@ -16,7 +16,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | File | Role |
 | --- | --- |
 | `App/Main.swift` | Entry point; starts the accessory (menu-bar) app |
-| `App/LidglowApp.swift` | Application delegate: status item, panel window, positioning, event monitors |
+| `App/LidglowApp.swift` | Application delegate: status item and its context menu, panel window, positioning, event monitors, Settings window |
 | `Glow/GlowMode.swift` | The modes and their icons |
 | `Glow/GlowModel.swift` | Mode and settings state, tick loop, session lifecycle |
 | `UI/GlowPanel.swift` | SwiftUI glow controls |
@@ -24,6 +24,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `UI/LaptopPreview.swift` | SceneKit intro and live logo close-up |
 | `UI/LaptopChassis.swift` | Laptop geometry and materials |
 | `UI/MenuPanel.swift` | Borderless key-capable panel |
+| `UI/SettingsWindow.swift` | The Settings window, built on open and released on close |
 | `Audio/SystemMusic.swift` | Core Audio tap lifecycle |
 | `Audio/BeatMeter.swift` | Bass and drum transient detection |
 | `Hardware/LidLogo.swift` | Logo brightness transitions, original state tracking, and restoration |

@@ -10,12 +10,26 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     private var layoutChanges: AnyCancellable?
     private var localMonitor: Any?
     private var outsideMonitor: Any?
+    private var settingsWindow: SettingsWindow?
+    private lazy var contextMenu: NSMenu = {
+        let menu = NSMenu()
+        let settings = NSMenuItem(title: "Open Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(settings)
+        menu.addItem(.separator())
+        let quit = NSMenuItem(title: "Quit Lidglow", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.target = NSApp
+        menu.addItem(quit)
+        return menu
+    }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item = status
         status.button?.target = self
-        status.button?.action = #selector(togglePanel)
+        status.button?.action = #selector(statusItemClicked)
+        // Act on mouse-up for both buttons so a right-click or Control-click can open the context menu.
+        status.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         model.onIconChange = { [weak self] in self?.setIcon(lit: $0) }
         model.onRiseFromDark = { [weak self] in
             guard let button = self?.item?.button else { return }
@@ -41,7 +55,35 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         item?.button?.toolTip = "Lidglow"
     }
 
-    @objc private func togglePanel() {
+    @objc private func statusItemClicked() {
+        guard let event = NSApp.currentEvent else { return togglePanel() }
+        if event.type == .rightMouseUp || event.modifierFlags.contains(.control) {
+            showContextMenu()
+        } else {
+            togglePanel()
+        }
+    }
+
+    private func showContextMenu() {
+        closePanel()
+        // Attaching the menu only for this click lets the status item show it with the system's own
+        // highlight and placement, while a normal click still toggles the panel.
+        item?.menu = contextMenu
+        item?.button?.performClick(nil)
+        item?.menu = nil
+    }
+
+    @objc private func openSettings() {
+        closePanel()
+        if settingsWindow == nil {
+            settingsWindow = SettingsWindow { [weak self] in self?.settingsWindow = nil }
+        }
+        // Lidglow is a menu-bar app, so it has to activate itself or the window opens behind other apps.
+        NSApp.activate()
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    private func togglePanel() {
         if panel?.isVisible == true {
             closePanel()
             return
@@ -97,7 +139,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Clicks on the menu-bar icon belong to `togglePanel()`. If a monitor closed the panel on mouse-down,
+    /// Clicks on the menu-bar icon belong to `statusItemClicked()`. If a monitor closed the panel on mouse-down,
     /// the button's action would find it hidden and open it again, so the icon could never close it.
     /// Test the click's screen position rather than its window, since the status item's window isn't
     /// guaranteed to be the one the event reports.
