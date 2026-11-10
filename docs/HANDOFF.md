@@ -5,9 +5,10 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 ## Current behavior
 
 - Lidglow starts in the menu bar and opens its controls only when the icon is clicked. The panel anchors below the status item, clamps to the active display’s visible frame, and expands down when Music controls appear. It scrolls when vertical space is limited.
-- Modes are System, Off, Steady, Breathe, and Music. System returns control to macOS. A fresh launch starts in System. Brightness, sensitivity, and idle glow settings persist.
+- Modes are System, Off, Steady, Breathe, and Music. System returns control to macOS and is the first-launch default. The selected mode, brightness, sensitivity, and idle glow settings persist.
 - Music uses a private Core Audio process tap to meter system playback, with separate bass and drum transient detection. It uses no microphone, stores no recordings, and has no network code.
-- Idle glow sets a base between hits and tracks, capped at 90% of the chosen peak so beats can still brighten the logo. Amber is a preview tint. The physical LED emits white.
+- Idle glow sets a base between hits and tracks, capped at 90% of the chosen peak so beats can still brighten the logo. The preview and physical LED both glow white.
+- Each opening of the panel replays the laptop animation, then switches to a 2D logo that follows the live brightness. Reduce Motion goes directly to the 2D view.
 - Music and logo control pause on session lock, sleep, or lid closure. Normal quit restores macOS control. Unsupported hardware uses the preview.
 
 ## Source map
@@ -18,11 +19,14 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `App/LidglowApp.swift` | Application delegate: status item, panel window, positioning, event monitors |
 | `Glow/GlowMode.swift` | The five modes and their icons |
 | `Glow/GlowModel.swift` | Mode and settings state, tick loop, session lifecycle |
-| `UI/GlowPanel.swift` | SwiftUI controls and logo preview |
+| `UI/GlowPanel.swift` | SwiftUI glow controls |
+| `UI/LaptopPreview.swift` | SceneKit intro and live logo close-up |
+| `UI/LaptopChassis.swift` | Laptop geometry and materials |
 | `UI/MenuPanel.swift` | Borderless key-capable panel |
 | `Audio/SystemMusic.swift` | Core Audio tap lifecycle |
 | `Audio/BeatMeter.swift` | Bass and drum transient detection |
 | `Hardware/LidLogo.swift` | Logo brightness transitions, original state tracking, and restoration |
+| `Hardware/LaptopFinish.swift` | Automatic laptop finish detection |
 | `Hardware/LogoBridge.h`, `.m` | IOKit hardware detection and dynamically loaded CoreBrightness calls |
 | `Resources/Info.plist` | Version, bundle ID, menu-bar activation, deployment target, and audio permission text |
 

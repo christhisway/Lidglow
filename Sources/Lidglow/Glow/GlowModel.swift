@@ -41,7 +41,7 @@ final class GlowModel: ObservableObject {
     private var latestLevel = 0.0
     /// The preview only needs live levels while the panel is on screen. A hidden SwiftUI host
     /// still lays out on every change, which costs more than the glow loop itself in Music mode.
-    var panelVisible = false {
+    @Published var panelVisible = false {
         didSet { if panelVisible && !oldValue { publishLevel(latestLevel) } }
     }
     var onIconChange: ((Bool) -> Void)?
@@ -74,9 +74,16 @@ final class GlowModel: ObservableObject {
         return logo.available ? "macOS is managing the lid logo" : "Lid logo service unavailable"
     }
 
+    func restoreSelectedMode() {
+        if let saved = UserDefaults.standard.string(forKey: "glowMode"), let mode = GlowMode(rawValue: saved) {
+            select(mode)
+        }
+    }
+
     func select(_ mode: GlowMode) {
         if mode != self.mode { stop() }
         self.mode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: "glowMode")
         onIconChange?(mode != .off)
         audioError = false
         phaseStart = ProcessInfo.processInfo.systemUptime
@@ -205,14 +212,15 @@ final class GlowModel: ObservableObject {
                 return
             }
         }
-        publishLevel(target)
+        publishLevel(mode == .music && hasHardware ? logo.measuredLevel : target)
         publishStatus(hasHardware ? label : "Preview · " + label)
     }
 
     private func publishLevel(_ value: Double) {
         latestLevel = value
         guard panelVisible else { return }
-        if abs(value - level) > 0.012 || (value == 0 && level != 0) { level = value }
+        let threshold = mode == .music ? 0.003 : 0.012
+        if abs(value - level) > threshold || (value == 0 && level != 0) { level = value }
     }
 
     private func publishStatus(_ value: String) {

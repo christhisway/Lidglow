@@ -15,7 +15,8 @@ struct GlowPanel: View {
                 Text("LID LIGHT").font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .tracking(2).foregroundStyle(.secondary)
             }
-            preview
+            LaptopPreview(level: model.mode == .system ? 0.65 : model.level,
+                           isVisible: model.panelVisible)
             HStack(spacing: 4) {
                 ForEach(GlowMode.allCases, id: \.self) { mode in
                     Button { model.select(mode) } label: {
@@ -47,8 +48,6 @@ struct GlowPanel: View {
                     if model.idleGlow {
                         control("Idle brightness", value: $model.idleBrightness, range: model.idleBrightnessRange,
                                 reading: "\(Int((model.idleBrightness * 100).rounded()))%")
-                        Text("Amber preview · The lid LED glows white")
-                            .font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -69,30 +68,6 @@ struct GlowPanel: View {
         .padding(16)
         .frame(maxWidth: .infinity)
         .preferredColorScheme(.dark)
-    }
-
-    private var preview: some View {
-        let glow = model.mode == .system ? 0.65 : model.level
-        let amber = Color(red: 1, green: 0.65, blue: 0.24)
-        let previewColor = model.mode == .music && model.idleGlow ? amber : .white
-        let haloColor = model.mode == .music && model.idleGlow ? amber : accent
-        return ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(red: 0.055, green: 0.07, blue: 0.09))
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(.white.opacity(0.075))
-            RoundedRectangle(cornerRadius: 8)
-                .fill(LinearGradient(colors: [Color(white: 0.24), Color(white: 0.105)],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(.white.opacity(0.15)) }
-                .frame(width: 152, height: 90)
-            Image(systemName: "apple.logo")
-                .font(.system(size: 30, weight: .light))
-                .foregroundStyle(previewColor.opacity(0.14 + glow * 0.86))
-                .shadow(color: haloColor.opacity(glow * 0.82), radius: 8)
-        }
-        .frame(height: 120)
-        .accessibilityHidden(true)
     }
 
     private func control(_ title: String, value: Binding<Double>, range: ClosedRange<Double>,

@@ -13,6 +13,7 @@ final class LidLogo {
     private var nextSettledCheck = 0.0
     private let settledRecheck = 0.5
     var isSettled: Bool { settledTarget != nil }
+    private(set) var measuredLevel = 0.0
     var onRiseFromDark: (() -> Void)?
 
     var available: Bool { bridge.mode >= 0 && bridge.level.isFinite }
@@ -66,13 +67,15 @@ final class LidLogo {
         settledTarget = nil
         let level = bridge.level
         guard level.isFinite else { return false }
+        measuredLevel = min(1, max(0, level))
         let delta = target - level
         if abs(delta) <= tolerance || (target == 0 && direction == false && !holding) {
             let needsHold = !holding && target > 0 && target < 1 && direction != nil
             if needsHold, let direction, now - lastChange > 0.045 {
                 return command(!direction, duration: 3600, hold: true, now: now)
             }
-            if !needsHold {
+            let reachedTarget = target == 0 ? level <= 0.003 : abs(delta) <= tolerance
+            if !needsHold && reachedTarget {
                 settledTarget = target
                 nextSettledCheck = now + settledRecheck
             }
