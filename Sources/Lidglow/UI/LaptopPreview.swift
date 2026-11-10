@@ -29,8 +29,8 @@ struct LaptopPreview: View {
             }
         }
         .frame(height: PreviewFraming.height)
-        .clipShape(.rect(cornerRadius: 12))
-        .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.10)) }
+        .clipShape(.rect(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(.white.opacity(0.10)) }
         .accessibilityHidden(true)
         .allowsHitTesting(false)
         .onChange(of: isVisible) { _, visible in
