@@ -65,6 +65,7 @@ final class GlowModel: ObservableObject {
         let distributed = DistributedNotificationCenter.default()
         distributed.addObserver(self, selector: #selector(lockSession), name: .init("com.apple.screenIsLocked"), object: nil)
         distributed.addObserver(self, selector: #selector(unlockSession), name: .init("com.apple.screenIsUnlocked"), object: nil)
+        music.onSound = { [weak self] in self?.speedUp() }
     }
 
     var hasHardware: Bool { logo.bridge.hardwarePresent }
@@ -90,11 +91,13 @@ final class GlowModel: ObservableObject {
         tick()
     }
 
-    // Music samples audio every tick, so it keeps the full rate. A 5 s breath doesn't need 60 Hz,
-    // and a settled or paused glow only needs to notice drift, lid closure, or a new target.
+    // Music samples audio every tick, so it keeps the full rate while sound is playing. A 5 s breath
+    // doesn't need 60 Hz, and a settled, paused, or silent glow only needs to notice drift, lid
+    // closure, or a new target. During silence the audio callback wakes the loop on the first beat.
     private static let fastTick = 1 / 60.0
     private static let breatheTick = 1 / 30.0
     private static let idleTick = 0.25
+    private static let silenceDelay = 2.0
 
     private func schedule(_ interval: Double) {
         timer?.invalidate()
@@ -111,7 +114,15 @@ final class GlowModel: ObservableObject {
             interval = Self.idleTick
         } else {
             switch mode {
-            case .music: interval = Self.fastTick
+            case .music:
+                let now = ProcessInfo.processInfo.systemUptime
+                let silent = lastSignal.map { now - $0 >= Self.silenceDelay } ?? true
+                if silent && (!hasHardware || logo.isSettled) {
+                    music.armWake()
+                    interval = Self.idleTick
+                } else {
+                    interval = Self.fastTick
+                }
             case .breathe: interval = Self.breatheTick
             default: interval = !hasHardware || logo.isSettled ? Self.idleTick : Self.fastTick
             }
@@ -175,11 +186,11 @@ final class GlowModel: ObservableObject {
             label = "Breathing"
         case .music:
             let signal = music.level(at: now)
-            if signal > 0.035 { lastSignal = now }
-            let pulse = min(1, max(0, (signal - 0.035) * sensitivity))
+            if signal > SystemMusic.soundThreshold { lastSignal = now }
+            let pulse = min(1, max(0, (signal - SystemMusic.soundThreshold) * sensitivity))
             let base = idleGlow ? idleBrightness : 0
             target = base + (brightness - base) * pulse
-            label = lastSignal.map { now - $0 < 2 } == true
+            label = lastSignal.map { now - $0 < Self.silenceDelay } == true
                 ? "Reacting to system audio" : "Waiting for music · Play something on your Mac"
         }
         if hasHardware {
