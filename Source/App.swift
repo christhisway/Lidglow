@@ -57,6 +57,12 @@ final class GlowModel: ObservableObject {
     private var hardwareCheck = 0.0
     private var mayRun = true
     private var lastSignal: Double?
+    private var latestLevel = 0.0
+    /// The preview only needs live levels while the panel is on screen. A hidden SwiftUI host
+    /// still lays out on every change, which costs more than the glow loop itself in Music mode.
+    var panelVisible = false {
+        didSet { if panelVisible && !oldValue { publishLevel(latestLevel) } }
+    }
     var onIconChange: ((Bool) -> Void)?
     var onRiseFromDark: (() -> Void)? {
         didSet { logo.onRiseFromDark = onRiseFromDark }
@@ -95,6 +101,7 @@ final class GlowModel: ObservableObject {
         hardwareCheck = 0
         if mode == .system {
             level = 0
+            latestLevel = 0
             status = idleStatus
             return
         }
@@ -180,6 +187,8 @@ final class GlowModel: ObservableObject {
     }
 
     private func publishLevel(_ value: Double) {
+        latestLevel = value
+        guard panelVisible else { return }
         if abs(value - level) > 0.012 || (value == 0 && level != 0) { level = value }
     }
 
@@ -379,7 +388,8 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             self.panel = panel
             self.host = host
         }
-        guard positionPanel(), let panel else { return }
+        model.panelVisible = true
+        guard positionPanel(), let panel else { model.panelVisible = false; return }
         if let scroll = panel.contentView as? NSScrollView, let document = scroll.documentView {
             let top = document.isFlipped ? 0 : max(0, document.frame.height - scroll.contentView.bounds.height)
             scroll.contentView.scroll(to: NSPoint(x: 0, y: top))
@@ -419,6 +429,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
 
     private func closePanel() {
         panel?.orderOut(nil)
+        model.panelVisible = false
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
         if let outsideMonitor { NSEvent.removeMonitor(outsideMonitor) }
         localMonitor = nil
