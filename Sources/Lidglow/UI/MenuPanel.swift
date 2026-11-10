@@ -24,7 +24,7 @@ final class MenuPanel: NSPanel {
         #endif
 
         let material = NSVisualEffectView()
-        material.material = .popover
+        material.material = .menu
         material.blendingMode = .behindWindow
         material.state = .active
         material.wantsLayer = true

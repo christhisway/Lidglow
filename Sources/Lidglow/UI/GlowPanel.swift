@@ -23,7 +23,7 @@ struct GlowPanel: View {
                 GlassSegments(items: GlowMode.allCases, selection: model.mode, select: model.select) { mode in
                     VStack(spacing: 5) {
                         Image(systemName: mode.icon).font(.system(size: 14, weight: .medium))
-                        Text(mode.rawValue).font(.system(size: 10, weight: .medium))
+                        Text(mode.rawValue).font(.caption.weight(.medium))
                     }
                     .frame(maxWidth: .infinity, minHeight: 46)
                 }
@@ -50,7 +50,7 @@ struct GlowPanel: View {
             Divider()
             HStack {
                 Text(model.status)
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel(model.status)
                 Spacer(minLength: 12)
@@ -58,7 +58,7 @@ struct GlowPanel: View {
             }
             if model.mode == .music {
                 Button("System Audio Settings…") { model.openAudioSettings() }
-                    .buttonStyle(.link).font(.system(size: 11))
+                    .buttonStyle(.link).font(.subheadline)
             }
         }
         .padding(18)
@@ -86,6 +86,6 @@ struct GlowPanel: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.primary.opacity(0.06), in: .rect(cornerRadius: 14))
+        .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
