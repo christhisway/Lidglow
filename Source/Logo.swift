@@ -7,6 +7,11 @@ final class LidLogo {
     private var direction: Bool?
     private var holding = false
     private var lastChange = -Double.infinity
+    // Each level read is a synchronous round trip to corebrightnessd. Once the logo has settled
+    // on an unchanged target, re-read it only every `settledRecheck` seconds to catch drift.
+    private var settledTarget: Double?
+    private var nextSettledCheck = 0.0
+    private let settledRecheck = 0.5
     var onRiseFromDark: (() -> Void)?
 
     var available: Bool { bridge.mode >= 0 && bridge.level.isFinite }
@@ -31,12 +36,14 @@ final class LidLogo {
         direction = nil
         holding = false
         lastChange = -.infinity
+        settledTarget = nil
         return true
     }
 
     func restore() {
         guard let mode = originalMode else { return }
         originalMode = nil
+        settledTarget = nil
         if direction != nil {
             let displayAwake = awake && !bridge.lidClosed
             if displayAwake {
@@ -54,12 +61,19 @@ final class LidLogo {
 
     func follow(_ target: Double, now: Double, rise: Double, fall: Double, tolerance: Double = 0.045) -> Bool {
         guard originalMode != nil else { return false }
+        if target == settledTarget && now < nextSettledCheck { return true }
+        settledTarget = nil
         let level = bridge.level
         guard level.isFinite else { return false }
         let delta = target - level
         if abs(delta) <= tolerance || (target == 0 && direction == false && !holding) {
-            if !holding, target > 0, target < 1, let direction, now - lastChange > 0.045 {
+            let needsHold = !holding && target > 0 && target < 1 && direction != nil
+            if needsHold, let direction, now - lastChange > 0.045 {
                 return command(!direction, duration: 3600, hold: true, now: now)
+            }
+            if !needsHold {
+                settledTarget = target
+                nextSettledCheck = now + settledRecheck
             }
             return true
         }
