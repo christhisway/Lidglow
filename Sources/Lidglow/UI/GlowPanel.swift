@@ -34,16 +34,17 @@ struct GlowPanel: View {
             .padding(4)
             .background(.primary.opacity(0.06), in: Capsule())
             if model.mode == .music || model.mode == .steady || model.mode == .breathe {
-                control("Brightness", value: $model.brightness, range: 0.05...1,
+                control("Brightness", icon: "sun.max", value: $model.brightness, range: 0.05...1,
                         reading: "\(Int((model.brightness * 100).rounded()))%")
             }
             if model.mode == .music {
-                control("Sensitivity", value: $model.sensitivity, range: 0.4...2.0,
+                control("Sensitivity", icon: "waveform", value: $model.sensitivity, range: 0.4...2.0,
                         reading: String(format: "%.1f×", model.sensitivity))
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 8) {
                     Toggle("Idle glow", isOn: $model.idleGlow).toggleStyle(.switch).controlSize(.small)
                     if model.idleGlow {
-                        control("Idle brightness", value: $model.idleBrightness, range: model.idleBrightnessRange,
+                        control("Idle brightness", icon: "moon", value: $model.idleBrightness,
+                                range: model.idleBrightnessRange,
                                 reading: "\(Int((model.idleBrightness * 100).rounded()))%")
                     }
                 }
@@ -66,15 +67,27 @@ struct GlowPanel: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func control(_ title: String, value: Binding<Double>, range: ClosedRange<Double>,
+    private func control(_ title: String, icon: String, value: Binding<Double>, range: ClosedRange<Double>,
                          reading: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack {
-                Text(title).font(.system(size: 12, weight: .medium))
-                Spacer()
-                Text(reading).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Label(title, systemImage: icon)
+                    .font(.subheadline.weight(.medium))
+                Spacer(minLength: 8)
+                Text(reading)
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.secondary)
             }
-            Slider(value: value, in: range).accessibilityLabel(title)
+            .accessibilityHidden(true)
+
+            Slider(value: value, in: range) { Text(title) }
+                .labelsHidden()
+                .controlSize(.large)
+                .tint(Color.primary.opacity(0.65))
+                .accessibilityValue(Text(reading))
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.primary.opacity(0.06), in: .rect(cornerRadius: 14))
     }
 }
