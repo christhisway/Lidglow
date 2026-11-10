@@ -20,6 +20,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `Glow/GlowMode.swift` | The five modes and their icons |
 | `Glow/GlowModel.swift` | Mode and settings state, tick loop, session lifecycle |
 | `UI/GlowPanel.swift` | SwiftUI glow controls |
+| `UI/GlassStyle.swift` | Shared Liquid Glass surfaces and the glass mode selector |
 | `UI/LaptopPreview.swift` | SceneKit intro and live logo close-up |
 | `UI/LaptopChassis.swift` | Laptop geometry and materials |
 | `UI/MenuPanel.swift` | Borderless key-capable panel |

@@ -14,25 +14,13 @@ struct GlowPanel: View {
             }
             LaptopPreview(level: model.mode == .system ? 0.65 : model.level,
                            isVisible: model.panelVisible)
-            HStack(spacing: 4) {
-                ForEach(GlowMode.allCases, id: \.self) { mode in
-                    Button { model.select(mode) } label: {
-                        VStack(spacing: 5) {
-                            Image(systemName: mode.icon).font(.system(size: 14, weight: .medium))
-                            Text(mode.rawValue).font(.system(size: 10, weight: .medium))
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 46)
-                        .foregroundStyle(.primary)
-                        .background(model.mode == mode ? Color.primary.opacity(0.16) : .clear,
-                                    in: Capsule())
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(model.mode == mode ? .isSelected : [])
+            GlassSegments(items: GlowMode.allCases, selection: model.mode, select: model.select) { mode in
+                VStack(spacing: 5) {
+                    Image(systemName: mode.icon).font(.system(size: 14, weight: .medium))
+                    Text(mode.rawValue).font(.system(size: 10, weight: .medium))
                 }
+                .frame(maxWidth: .infinity, minHeight: 46)
             }
-            .padding(4)
-            .background(.primary.opacity(0.06), in: Capsule())
             if model.mode == .music || model.mode == .steady || model.mode == .breathe {
                 control("Brightness", icon: "sun.max", value: $model.brightness, range: 0.05...1,
                         reading: "\(Int((model.brightness * 100).rounded()))%")

@@ -19,7 +19,7 @@ Audio processing runs locally through a private Core Audio tap. The app reduces 
 Sources/Lidglow/
   App/        Entry point and application delegate (status item, panel window)
   Glow/       Glow modes and the model that drives the logo each tick
-  UI/         SwiftUI controls, the borderless menu panel, and the animated laptop preview
+  UI/         SwiftUI controls, shared Liquid Glass styling, the borderless menu panel, and the animated laptop preview
   Audio/      Core Audio process tap and the BeatMeter detector
   Hardware/   Lid logo control, laptop finish detection, and the Objective-C CoreBrightness bridge
   Resources/  Info.plist
