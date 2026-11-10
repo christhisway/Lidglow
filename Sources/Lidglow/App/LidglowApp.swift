@@ -82,16 +82,29 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         panel.makeKeyAndOrderFront(nil)
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) {
             [weak self] event in
+            guard let self else { return event }
             if event.type == .keyDown {
-                if event.keyCode == 53 { self?.closePanel(); return nil }
-            } else if event.window !== self?.panel && event.window !== self?.item?.button?.window {
-                self?.closePanel()
+                if event.keyCode == 53 { self.closePanel(); return nil }
+            } else if event.window !== self.panel && !self.clickIsOnStatusItem() {
+                self.closePanel()
             }
             return event
         }
         outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) {
-            [weak self] _ in self?.closePanel()
+            [weak self] _ in
+            guard let self, !self.clickIsOnStatusItem() else { return }
+            self.closePanel()
         }
+    }
+
+    /// Clicks on the menu-bar icon belong to `togglePanel()`. If a monitor closed the panel on mouse-down,
+    /// the button's action would find it hidden and open it again, so the icon could never close it.
+    /// Test the click's screen position rather than its window, since the status item's window isn't
+    /// guaranteed to be the one the event reports.
+    private func clickIsOnStatusItem() -> Bool {
+        guard let button = item?.button, let window = button.window else { return false }
+        let frame = window.convertToScreen(button.convert(button.bounds, to: nil))
+        return frame.insetBy(dx: -1, dy: -1).contains(NSEvent.mouseLocation)
     }
 
     @discardableResult

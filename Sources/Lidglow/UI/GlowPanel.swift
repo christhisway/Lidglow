@@ -11,48 +11,46 @@ struct GlowPanel: View {
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.primary)
                 Text("Lidglow").font(.headline)
+                Spacer(minLength: 12)
+                Toggle("Control the lid logo", isOn: Binding(get: { model.enabled }, set: model.setEnabled))
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .help(model.enabled ? "Turn off to let macOS control the lid logo"
+                                        : "Turn on to control the lid logo with Lidglow")
             }
-            LaptopPreview(level: model.mode == .system ? 0.65 : model.level,
-                           isVisible: model.panelVisible)
-            HStack(spacing: 4) {
-                ForEach(GlowMode.allCases, id: \.self) { mode in
-                    Button { model.select(mode) } label: {
-                        VStack(spacing: 5) {
-                            Image(systemName: mode.icon).font(.system(size: 14, weight: .medium))
-                            Text(mode.rawValue).font(.system(size: 10, weight: .medium))
+            LaptopPreview(level: model.enabled ? model.level : 0.65, isVisible: model.panelVisible)
+            VStack(alignment: .leading, spacing: 15) {
+                GlassSegments(items: GlowMode.allCases, selection: model.mode, select: model.select) { mode in
+                    VStack(spacing: 5) {
+                        Image(systemName: mode.icon).font(.system(size: 14, weight: .medium))
+                        Text(mode.rawValue).font(.caption.weight(.medium))
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                }
+                control("Brightness", icon: "sun.max", value: $model.brightness, range: 0...1,
+                        reading: model.brightness > 0 ? "\(Int((model.brightness * 100).rounded()))%" : "Off")
+                if model.mode == .music {
+                    control("Sensitivity", icon: "waveform", value: $model.sensitivity, range: 0.4...2.0,
+                            reading: String(format: "%.1f×", model.sensitivity))
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Idle glow", isOn: $model.idleGlow).toggleStyle(.switch).controlSize(.small)
+                        if model.idleGlow {
+                            control("Idle brightness", icon: "moon", value: $model.idleBrightness,
+                                    range: model.idleBrightnessRange,
+                                    reading: "\(Int((model.idleBrightness * 100).rounded()))%")
+                                .disabled(model.brightness == 0)
                         }
-                        .frame(maxWidth: .infinity, minHeight: 46)
-                        .foregroundStyle(.primary)
-                        .background(model.mode == mode ? Color.primary.opacity(0.16) : .clear,
-                                    in: Capsule())
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(model.mode == mode ? .isSelected : [])
-                }
-            }
-            .padding(4)
-            .background(.primary.opacity(0.06), in: Capsule())
-            if model.mode == .music || model.mode == .steady || model.mode == .breathe {
-                control("Brightness", icon: "sun.max", value: $model.brightness, range: 0.05...1,
-                        reading: "\(Int((model.brightness * 100).rounded()))%")
-            }
-            if model.mode == .music {
-                control("Sensitivity", icon: "waveform", value: $model.sensitivity, range: 0.4...2.0,
-                        reading: String(format: "%.1f×", model.sensitivity))
-                VStack(alignment: .leading, spacing: 8) {
-                    Toggle("Idle glow", isOn: $model.idleGlow).toggleStyle(.switch).controlSize(.small)
-                    if model.idleGlow {
-                        control("Idle brightness", icon: "moon", value: $model.idleBrightness,
-                                range: model.idleBrightnessRange,
-                                reading: "\(Int((model.idleBrightness * 100).rounded()))%")
                     }
                 }
             }
+            // While macOS has the logo, the modes and their settings stay visible but inactive.
+            .disabled(!model.enabled)
+            .opacity(model.enabled ? 1 : 0.45)
+            .animation(.easeInOut(duration: 0.2), value: model.enabled)
             Divider()
             HStack {
                 Text(model.status)
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel(model.status)
                 Spacer(minLength: 12)
@@ -60,7 +58,7 @@ struct GlowPanel: View {
             }
             if model.mode == .music {
                 Button("System Audio Settings…") { model.openAudioSettings() }
-                    .buttonStyle(.link).font(.system(size: 11))
+                    .buttonStyle(.link).font(.subheadline)
             }
         }
         .padding(18)
@@ -88,6 +86,6 @@ struct GlowPanel: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.primary.opacity(0.06), in: .rect(cornerRadius: 14))
+        .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }

@@ -18,6 +18,6 @@
 
 - **Privacy:** Lidglow has no network code, uses no microphone, and stores no audio. Audio samples are reduced to a level and discarded. Keep it that way; never add networking, telemetry, or recording without the owner's explicit sign-off.
 - **Energy:** This is an always-running menu-bar app, so energy impact matters. Keep the tick timer only as fast as each mode needs, avoid redundant hardware reads and redraws, and don't add polling where an event or notification works.
-- **Hardware safety:** Logo control goes through a private CoreBrightness interface. Keep hardware detection and restore-to-macOS behavior (System mode, quit, lock, sleep, lid close) intact on every change to `Hardware/` or `Glow/`.
+- **Hardware safety:** Logo control goes through a private CoreBrightness interface. Keep hardware detection and restore-to-macOS behavior (switch off, quit, lock, sleep, lid close) intact on every change to `Hardware/` or `Glow/`.
 - **Versioning:** Only bump `CFBundleShortVersionString` and `CFBundleVersion` in `Sources/Lidglow/Resources/Info.plist` when asked, and always bump both. Never change the bundle ID.
 - **Docs:** When adding, moving, or renaming source files, update the layout in `README.md` and the source map in `docs/HANDOFF.md`.
