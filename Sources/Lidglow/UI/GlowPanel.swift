@@ -21,9 +21,9 @@ struct GlowPanel: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 46)
             }
-            if model.mode == .music || model.mode == .steady || model.mode == .breathe {
-                control("Brightness", icon: "sun.max", value: $model.brightness, range: 0.05...1,
-                        reading: "\(Int((model.brightness * 100).rounded()))%")
+            if model.mode != .system {
+                control("Brightness", icon: "sun.max", value: $model.brightness, range: 0...1,
+                        reading: model.brightness > 0 ? "\(Int((model.brightness * 100).rounded()))%" : "Off")
             }
             if model.mode == .music {
                 control("Sensitivity", icon: "waveform", value: $model.sensitivity, range: 0.4...2.0,
@@ -34,6 +34,7 @@ struct GlowPanel: View {
                         control("Idle brightness", icon: "moon", value: $model.idleBrightness,
                                 range: model.idleBrightnessRange,
                                 reading: "\(Int((model.idleBrightness * 100).rounded()))%")
+                            .disabled(model.brightness == 0)
                     }
                 }
             }

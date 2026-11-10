@@ -7,7 +7,13 @@ final class GlowModel: ObservableObject {
     @Published private(set) var status = "Checking lid hardware…"
     @Published private(set) var audioError = false
     @Published var brightness = UserDefaults.standard.object(forKey: "brightness") as? Double ?? 0.82 {
-        didSet { UserDefaults.standard.set(brightness, forKey: "brightness"); speedUp() }
+        didSet {
+            // The far left of the slider turns the logo off, so snap a near-zero drag to exactly zero.
+            if brightness != 0 && brightness < 0.01 { brightness = 0 }
+            UserDefaults.standard.set(brightness, forKey: "brightness")
+            updateIcon()
+            speedUp()
+        }
     }
     @Published var sensitivity = UserDefaults.standard.object(forKey: "sensitivity") as? Double ?? 1.0 {
         didSet { UserDefaults.standard.set(sensitivity, forKey: "sensitivity") }
@@ -20,7 +26,9 @@ final class GlowModel: ObservableObject {
         didSet { UserDefaults.standard.set(preferredIdleBrightness, forKey: "idleBrightness") }
     }
 
-    var idleBrightnessRange: ClosedRange<Double> { 0.01...(brightness * 0.90) }
+    /// Idle glow stays below 90% of the peak. The slider keeps a usable range even at zero brightness,
+    /// and `tick()` applies the cap, so idle glow can never outshine the peak.
+    var idleBrightnessRange: ClosedRange<Double> { 0.01...max(0.02, brightness * 0.90) }
     var idleBrightness: Double {
         get {
             let preferred = preferredIdleBrightness ?? min(0.12, brightness * 0.30)
@@ -75,16 +83,18 @@ final class GlowModel: ObservableObject {
     }
 
     func restoreSelectedMode() {
-        if let saved = UserDefaults.standard.string(forKey: "glowMode"), let mode = GlowMode(rawValue: saved) {
-            select(mode)
-        }
+        guard var saved = UserDefaults.standard.string(forKey: "glowMode") else { return }
+        // Lidglow 1.0 had separate Off and Steady modes. Both are now Standard, with Off at zero brightness.
+        if saved == "Off" { brightness = 0 }
+        if saved == "Off" || saved == "Steady" { saved = GlowMode.standard.rawValue }
+        if let mode = GlowMode(rawValue: saved) { select(mode) }
     }
 
     func select(_ mode: GlowMode) {
         if mode != self.mode { stop() }
         self.mode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: "glowMode")
-        onIconChange?(mode != .off)
+        updateIcon()
         audioError = false
         phaseStart = ProcessInfo.processInfo.systemUptime
         hardwareCheck = 0
@@ -101,6 +111,11 @@ final class GlowModel: ObservableObject {
     // Music samples audio every tick, so it keeps the full rate while sound is playing. A 5 s breath
     // doesn't need 60 Hz, and a settled, paused, or silent glow only needs to notice drift, lid
     // closure, or a new target. During silence the audio callback wakes the loop on the first beat.
+    /// The menu-bar icon shows an empty circle while Lidglow is holding the logo dark.
+    private func updateIcon() {
+        onIconChange?(mode == .system || brightness > 0)
+    }
+
     private static let fastTick = 1 / 60.0
     private static let breatheTick = 1 / 30.0
     private static let idleTick = 0.25
@@ -186,8 +201,7 @@ final class GlowModel: ObservableObject {
         let label: String
         switch mode {
         case .system: return
-        case .off: target = 0; label = "Lid logo off"
-        case .steady: target = brightness; label = "Steady glow"
+        case .standard: target = brightness; label = brightness > 0 ? "Standard glow" : "Lid logo off"
         case .breathe:
             target = brightness * (0.15 + 0.85 * (1 - cos((now - phaseStart) * 2 * .pi / 5)) / 2)
             label = "Breathing"
@@ -195,7 +209,7 @@ final class GlowModel: ObservableObject {
             let signal = music.level(at: now)
             if signal > SystemMusic.soundThreshold { lastSignal = now }
             let pulse = min(1, max(0, (signal - SystemMusic.soundThreshold) * sensitivity))
-            let base = idleGlow ? idleBrightness : 0
+            let base = idleGlow ? min(idleBrightness, brightness * 0.90) : 0
             target = base + (brightness - base) * pulse
             label = lastSignal.map { now - $0 < Self.silenceDelay } == true
                 ? "Reacting to system audio" : "Waiting for music · Play something on your Mac"
