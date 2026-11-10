@@ -135,9 +135,14 @@ final class GlowModel: ObservableObject {
         tick()
     }
 
-    /// The menu-bar icon shows an empty circle while Lidglow is holding the logo dark.
+    /// The menu-bar icon shows an empty circle while Lidglow is holding the logo dark. Brightness drags
+    /// call this on every change, so only touch the status item when the icon actually flips.
+    private var iconLit: Bool?
     private func updateIcon() {
-        onIconChange?(!enabled || brightness > 0)
+        let lit = !enabled || brightness > 0
+        guard lit != iconLit else { return }
+        iconLit = lit
+        onIconChange?(lit)
     }
 
     // Music samples audio every tick, so it keeps the full rate while sound is playing. A 5 s breath
