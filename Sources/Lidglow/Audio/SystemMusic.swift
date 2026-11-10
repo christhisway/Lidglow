@@ -13,7 +13,19 @@ final class SystemMusic {
     private var callback: AudioDeviceIOProcID?
     private let lock = NSLock()
     private var latest = (time: 0.0, level: 0.0)
+    private var wakeArmed = false
     var running: Bool { callback != nil }
+    /// Meter level above which the glow treats audio as music rather than silence.
+    static let soundThreshold = 0.035
+    /// Called on the main queue the first time sound crosses the threshold after `armWake()`.
+    var onSound: (() -> Void)?
+
+    /// Lets the glow loop tick slowly during silence without missing the first beat.
+    func armWake() {
+        lock.lock()
+        wakeArmed = true
+        lock.unlock()
+    }
 
     func start() throws {
         guard !running else { return }
@@ -57,7 +69,10 @@ final class SystemMusic {
                 let level = meter.process(data.assumingMemoryBound(to: Float.self), frames: frames, channels: channels)
                 guard let self, self.lock.try() else { return }
                 self.latest = (ProcessInfo.processInfo.systemUptime, level)
+                let wake = self.wakeArmed && level > Self.soundThreshold
+                if wake { self.wakeArmed = false }
                 self.lock.unlock()
+                if wake { DispatchQueue.main.async { [weak self] in self?.onSound?() } }
             }, "Audio callback")
             try check(AudioDeviceStart(device, callback), "System audio")
         } catch {
@@ -84,6 +99,7 @@ final class SystemMusic {
         tap = kAudioObjectUnknown
         lock.lock()
         latest = (0, 0)
+        wakeArmed = false
         lock.unlock()
     }
 
