@@ -1,4 +1,4 @@
-LIDGLOW 1.4
+LIDGLOW 1.0
 
 Lidglow pulses the illuminated Apple logo to the music playing on your Mac.
 

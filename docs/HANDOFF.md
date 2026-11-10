@@ -1,6 +1,6 @@
 # Lidglow handoff
 
-This package captures Lidglow 1.4 (build 5). Open the extracted folder as a workspace and use `Sources/Lidglow/` as the source of truth. The bundled `Lidglow.app` is the compiled release. `docs/START HERE.txt` covers installation and first use.
+This package captures Lidglow 1.0 (build 1). Open the extracted folder as a workspace and use `Sources/Lidglow/` as the source of truth. The bundled `Lidglow.app` is the compiled release. `docs/START HERE.txt` covers installation and first use.
 
 ## Current behavior
 
