@@ -2,7 +2,9 @@ import AppKit
 import Combine
 
 final class GlowModel: ObservableObject {
-    @Published private(set) var mode: GlowMode = .system
+    @Published private(set) var mode: GlowMode = .standard
+    /// Whether Lidglow drives the logo. Off hands the logo back to macOS, which was System mode in 1.0.
+    @Published private(set) var enabled = false
     @Published private(set) var level = 0.0
     @Published private(set) var status = "Checking lid hardware…"
     @Published private(set) var audioError = false
@@ -82,23 +84,48 @@ final class GlowModel: ObservableObject {
         return logo.available ? "macOS is managing the lid logo" : "Lid logo service unavailable"
     }
 
+    private static let modeKey = "glowMode"
+    private static let enabledKey = "glowEnabled"
+
     func restoreSelectedMode() {
-        guard var saved = UserDefaults.standard.string(forKey: "glowMode") else { return }
-        // Lidglow 1.0 had separate Off and Steady modes. Both are now Standard, with Off at zero brightness.
-        if saved == "Off" { brightness = 0 }
-        if saved == "Off" || saved == "Steady" { saved = GlowMode.standard.rawValue }
-        if let mode = GlowMode(rawValue: saved) { select(mode) }
+        let defaults = UserDefaults.standard
+        var saved = defaults.string(forKey: Self.modeKey)
+        // Lidglow 1.0 saved System, Off, and Steady as modes. System is now the switch turned off,
+        // and Off and Steady are both Standard, with Off at zero brightness.
+        switch saved {
+        case "System": defaults.set(false, forKey: Self.enabledKey); saved = nil
+        case "Off": brightness = 0; saved = GlowMode.standard.rawValue
+        case "Steady": saved = GlowMode.standard.rawValue
+        default: break
+        }
+        mode = saved.flatMap(GlowMode.init(rawValue:)) ?? .standard
+        defaults.set(mode.rawValue, forKey: Self.modeKey)
+        // Before the switch existed, any saved mode other than System meant Lidglow was in control.
+        // A first launch leaves the logo to macOS.
+        setEnabled(defaults.object(forKey: Self.enabledKey) as? Bool ?? (saved != nil))
     }
 
     func select(_ mode: GlowMode) {
         if mode != self.mode { stop() }
         self.mode = mode
-        UserDefaults.standard.set(mode.rawValue, forKey: "glowMode")
+        UserDefaults.standard.set(mode.rawValue, forKey: Self.modeKey)
+        start()
+    }
+
+    /// Turning Lidglow off stops the glow loop and restores the logo to macOS.
+    func setEnabled(_ on: Bool) {
+        if !on { stop() }
+        enabled = on
+        UserDefaults.standard.set(on, forKey: Self.enabledKey)
+        start()
+    }
+
+    private func start() {
         updateIcon()
         audioError = false
         phaseStart = ProcessInfo.processInfo.systemUptime
         hardwareCheck = 0
-        if mode == .system {
+        guard enabled else {
             level = 0
             latestLevel = 0
             status = idleStatus
@@ -108,14 +135,14 @@ final class GlowModel: ObservableObject {
         tick()
     }
 
+    /// The menu-bar icon shows an empty circle while Lidglow is holding the logo dark.
+    private func updateIcon() {
+        onIconChange?(!enabled || brightness > 0)
+    }
+
     // Music samples audio every tick, so it keeps the full rate while sound is playing. A 5 s breath
     // doesn't need 60 Hz, and a settled, paused, or silent glow only needs to notice drift, lid
     // closure, or a new target. During silence the audio callback wakes the loop on the first beat.
-    /// The menu-bar icon shows an empty circle while Lidglow is holding the logo dark.
-    private func updateIcon() {
-        onIconChange?(mode == .system || brightness > 0)
-    }
-
     private static let fastTick = 1 / 60.0
     private static let breatheTick = 1 / 30.0
     private static let idleTick = 0.25
@@ -146,7 +173,7 @@ final class GlowModel: ObservableObject {
                     interval = Self.fastTick
                 }
             case .breathe: interval = Self.breatheTick
-            default: interval = !hasHardware || logo.isSettled ? Self.idleTick : Self.fastTick
+            case .standard: interval = !hasHardware || logo.isSettled ? Self.idleTick : Self.fastTick
             }
         }
         if abs(timer.timeInterval - interval) > 1e-6 { schedule(interval) }
@@ -175,6 +202,7 @@ final class GlowModel: ObservableObject {
     @objc private func unlockSession() { sessionActive = true; hardwareCheck = 0; speedUp() }
 
     private func tick() {
+        guard enabled else { return }
         defer { scheduleNextTick() }
         let now = ProcessInfo.processInfo.systemUptime
         if now >= hardwareCheck {
@@ -200,7 +228,6 @@ final class GlowModel: ObservableObject {
         let target: Double
         let label: String
         switch mode {
-        case .system: return
         case .standard: target = brightness; label = brightness > 0 ? "Standard glow" : "Lid logo off"
         case .breathe:
             target = brightness * (0.15 + 0.85 * (1 - cos((now - phaseStart) * 2 * .pi / 5)) / 2)

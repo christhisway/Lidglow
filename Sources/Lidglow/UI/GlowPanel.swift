@@ -11,33 +11,42 @@ struct GlowPanel: View {
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.primary)
                 Text("Lidglow").font(.headline)
+                Spacer(minLength: 12)
+                Toggle("Control the lid logo", isOn: Binding(get: { model.enabled }, set: model.setEnabled))
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .help(model.enabled ? "Turn off to let macOS control the lid logo"
+                                        : "Turn on to control the lid logo with Lidglow")
             }
-            LaptopPreview(level: model.mode == .system ? 0.65 : model.level,
-                           isVisible: model.panelVisible)
-            GlassSegments(items: GlowMode.allCases, selection: model.mode, select: model.select) { mode in
-                VStack(spacing: 5) {
-                    Image(systemName: mode.icon).font(.system(size: 14, weight: .medium))
-                    Text(mode.rawValue).font(.system(size: 10, weight: .medium))
+            LaptopPreview(level: model.enabled ? model.level : 0.65, isVisible: model.panelVisible)
+            VStack(alignment: .leading, spacing: 15) {
+                GlassSegments(items: GlowMode.allCases, selection: model.mode, select: model.select) { mode in
+                    VStack(spacing: 5) {
+                        Image(systemName: mode.icon).font(.system(size: 14, weight: .medium))
+                        Text(mode.rawValue).font(.system(size: 10, weight: .medium))
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 46)
                 }
-                .frame(maxWidth: .infinity, minHeight: 46)
-            }
-            if model.mode != .system {
                 control("Brightness", icon: "sun.max", value: $model.brightness, range: 0...1,
                         reading: model.brightness > 0 ? "\(Int((model.brightness * 100).rounded()))%" : "Off")
-            }
-            if model.mode == .music {
-                control("Sensitivity", icon: "waveform", value: $model.sensitivity, range: 0.4...2.0,
-                        reading: String(format: "%.1f×", model.sensitivity))
-                VStack(alignment: .leading, spacing: 8) {
-                    Toggle("Idle glow", isOn: $model.idleGlow).toggleStyle(.switch).controlSize(.small)
-                    if model.idleGlow {
-                        control("Idle brightness", icon: "moon", value: $model.idleBrightness,
-                                range: model.idleBrightnessRange,
-                                reading: "\(Int((model.idleBrightness * 100).rounded()))%")
-                            .disabled(model.brightness == 0)
+                if model.mode == .music {
+                    control("Sensitivity", icon: "waveform", value: $model.sensitivity, range: 0.4...2.0,
+                            reading: String(format: "%.1f×", model.sensitivity))
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Idle glow", isOn: $model.idleGlow).toggleStyle(.switch).controlSize(.small)
+                        if model.idleGlow {
+                            control("Idle brightness", icon: "moon", value: $model.idleBrightness,
+                                    range: model.idleBrightnessRange,
+                                    reading: "\(Int((model.idleBrightness * 100).rounded()))%")
+                                .disabled(model.brightness == 0)
+                        }
                     }
                 }
             }
+            // While macOS has the logo, the modes and their settings stay visible but inactive.
+            .disabled(!model.enabled)
+            .opacity(model.enabled ? 1 : 0.45)
+            .animation(.easeInOut(duration: 0.2), value: model.enabled)
             Divider()
             HStack {
                 Text(model.status)
