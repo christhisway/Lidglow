@@ -21,5 +21,5 @@ sender and macOS offers Open Anyway, find it in System Settings > Privacy &
 Security after trying to open the app. Apple explains the steps here:
 https://support.apple.com/en-us/102445
 
-If you prefer to build locally, open Source/README.md. Give HANDOFF.md to your
-coding agent if you want to continue developing Lidglow.
+If you prefer to build locally, open README.md in the source folder. Give
+docs/HANDOFF.md to your coding agent if you want to continue developing Lidglow.

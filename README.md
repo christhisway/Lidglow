@@ -13,17 +13,29 @@ If Music remains on “Waiting for music” during playback, use **System Audio 
 
 Audio processing runs locally through a private Core Audio tap. The app reduces playback to a level driven by bass and drum hits and discards the samples. Hardware modes pause when the session locks, the display sleeps, or the lid closes. Older Macs can use the in-panel preview.
 
+## Project layout
+
+```
+Sources/Lidglow/
+  App/        Entry point and application delegate (status item, panel window)
+  Glow/       Glow modes and the model that drives the logo each tick
+  UI/         SwiftUI controls and the borderless menu panel
+  Audio/      Core Audio process tap and the BeatMeter detector
+  Hardware/   Lid logo control and the Objective-C CoreBrightness bridge
+  Resources/  Info.plist
+Tests/BeatMeterTests/  Synthetic beat detector check
+Scripts/      build.sh and test.sh
+docs/         Handoff notes and the end-user install guide
+```
+
 ## Build
 
-Install Xcode or the macOS Command Line Tools (`xcode-select --install`), then run `./build.sh` from this directory. The script builds, signs, and verifies `../build/Lidglow.app` using the Mac's native architecture. Pass a path as the first argument to choose a different destination. No third-party dependencies are required.
+Install Xcode or the macOS Command Line Tools (`xcode-select --install`), then run `Scripts/build.sh` from the repository root. The script builds, signs, and verifies `build/Lidglow.app` using the Mac's native architecture. Pass a path as the first argument to choose a different destination; relative paths resolve against the repository root. No third-party dependencies are required.
 
-To run the synthetic beat detector check from this directory:
+To run the synthetic beat detector check:
 
 ```sh
-mkdir -p ../build
-xcrun swiftc -O -target "$(uname -m)-apple-macos14.2" \
-  -module-cache-path ../build/ModuleCache Music.swift Tests/BeatMeterCheck.swift -o ../build/BeatMeterCheck
-../build/BeatMeterCheck
+Scripts/test.sh
 ```
 
 The default signature is ad hoc. For a notarization candidate, set `LIDGLOW_SIGN_IDENTITY` to a Developer ID Application identity installed in your keychain. This enables the hardened runtime and secure timestamp. Submit and staple the resulting app before distributing it as a notarized release. [Apple’s notarization instructions](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)

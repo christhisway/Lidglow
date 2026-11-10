@@ -1,6 +1,6 @@
 # Lidglow handoff
 
-This package captures Lidglow 1.4 (build 5). Open the extracted folder as a workspace and use `Source/` as the source of truth. The bundled `Lidglow.app` is the compiled release. `START HERE.txt` covers installation and first use.
+This package captures Lidglow 1.4 (build 5). Open the extracted folder as a workspace and use `Sources/Lidglow/` as the source of truth. The bundled `Lidglow.app` is the compiled release. `docs/START HERE.txt` covers installation and first use.
 
 ## Current behavior
 
@@ -14,17 +14,23 @@ This package captures Lidglow 1.4 (build 5). Open the extracted folder as a work
 
 | File | Role |
 | --- | --- |
-| `App.swift` | AppKit status item and panel, SwiftUI controls, mode and settings state, session lifecycle |
-| `Music.swift` | Core Audio tap lifecycle and `BeatMeter` |
-| `Logo.swift` | Logo brightness transitions, original state tracking, and restoration |
-| `LogoBridge.h`, `LogoBridge.m` | IOKit hardware detection and dynamically loaded CoreBrightness calls |
-| `Info.plist` | Version, bundle ID, menu-bar activation, deployment target, and audio permission text |
-| `build.sh` | Command-line build and signing |
-| `Tests/BeatMeterCheck.swift` | Synthetic checks for kick and snare response, steady audio, and silence |
+| `App/Main.swift` | Entry point; starts the accessory (menu-bar) app |
+| `App/LidglowApp.swift` | Application delegate: status item, panel window, positioning, event monitors |
+| `Glow/GlowMode.swift` | The five modes and their icons |
+| `Glow/GlowModel.swift` | Mode and settings state, tick loop, session lifecycle |
+| `UI/GlowPanel.swift` | SwiftUI controls and logo preview |
+| `UI/MenuPanel.swift` | Borderless key-capable panel |
+| `Audio/SystemMusic.swift` | Core Audio tap lifecycle |
+| `Audio/BeatMeter.swift` | Bass and drum transient detection |
+| `Hardware/LidLogo.swift` | Logo brightness transitions, original state tracking, and restoration |
+| `Hardware/LogoBridge.h`, `.m` | IOKit hardware detection and dynamically loaded CoreBrightness calls |
+| `Resources/Info.plist` | Version, bundle ID, menu-bar activation, deployment target, and audio permission text |
+
+Paths are relative to `Sources/Lidglow/`. Outside it, `Scripts/build.sh` builds and signs the app, `Scripts/test.sh` runs `Tests/BeatMeterTests/BeatMeterCheck.swift` (synthetic checks for kick and snare response, steady audio, and silence).
 
 ## Build and verify
 
-Run `cd Source && ./build.sh` from the package root. It writes `build/Lidglow.app` and leaves the bundled release in place. See [the source README](Source/README.md) for compiler setup, the beat test command, and Developer ID signing. No package manager, external assets, or credentials are needed for local builds. Bump both version fields in `Info.plist` for a release and keep the bundle ID stable for an in-place update.
+Run `Scripts/build.sh` from the repository root. It writes `build/Lidglow.app` and leaves the bundled release in place. Run `Scripts/test.sh` for the beat check. See [the README](../README.md) for compiler setup and Developer ID signing. No package manager, external assets, or credentials are needed for local builds. Bump both version fields in `Resources/Info.plist` for a release and keep the bundle ID stable for an in-place update.
 
 This build was exercised on the original Mac. Previous checks confirmed that the hardware reached several brightness levels and returned to macOS control, that playback reached Music mode, and that the panel stayed within the screen when expanded. The synthetic check covers 44.1, 48, and 96 kHz. Recheck actual hardware behavior and first launch on the recipient’s Mac.
 
