@@ -28,6 +28,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
                 guard let self, self.panel?.isVisible == true else { return }
                 self.positionPanel()
             }
+        model.restoreSelectedMode()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
