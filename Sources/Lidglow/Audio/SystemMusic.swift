@@ -14,6 +14,7 @@ final class SystemMusic {
     private let lock = NSLock()
     private var latest = (time: 0.0, level: 0.0)
     private var wakeArmed = false
+    private var requestedPreset = EQPreset.bass
     var running: Bool { callback != nil }
     /// Meter level above which the glow treats audio as music rather than silence.
     static let soundThreshold = 0.035
@@ -25,6 +26,12 @@ final class SystemMusic {
         lock.lock()
         wakeArmed = true
         lock.unlock()
+    }
+
+    /// Which part of the spectrum drives the level. The audio callback picks it up on its next buffer.
+    var preset: EQPreset {
+        get { lock.lock(); defer { lock.unlock() }; return requestedPreset }
+        set { lock.lock(); requestedPreset = newValue; lock.unlock() }
     }
 
     func start() throws {
@@ -60,6 +67,7 @@ final class SystemMusic {
             try check(AudioHardwareCreateAggregateDevice(configuration as CFDictionary, &device), "Audio device")
 
             var meter = BeatMeter(sampleRate: format.mSampleRate)
+            meter.preset = preset
             try check(AudioDeviceCreateIOProcIDWithBlock(&callback, device, nil) { [weak self] _, input, _, _, _ in
                 let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
                 guard let buffer = buffers.first(where: { $0.mData != nil }), let data = buffer.mData,
@@ -69,6 +77,8 @@ final class SystemMusic {
                 let level = meter.process(data.assumingMemoryBound(to: Float.self), frames: frames, channels: channels)
                 guard let self, self.lock.try() else { return }
                 self.latest = (ProcessInfo.processInfo.systemUptime, level)
+                // The callback never waits on the lock, so a preset change applies from the next buffer.
+                meter.preset = self.requestedPreset
                 let wake = self.wakeArmed && level > Self.soundThreshold
                 if wake { self.wakeArmed = false }
                 self.lock.unlock()
