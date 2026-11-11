@@ -60,6 +60,7 @@ final class GlowModel: ObservableObject {
     }
 
     init() {
+        logo.recoverAfterUnexpectedExit()
         status = idleStatus
         let events: [(NSNotification.Name, Selector)] = [
             (NSWorkspace.screensDidSleepNotification, #selector(screenSleep)),
