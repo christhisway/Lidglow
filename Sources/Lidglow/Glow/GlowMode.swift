@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 enum GlowMode: String, CaseIterable {
     case standard = "Standard"
     case breathe = "Breathe"

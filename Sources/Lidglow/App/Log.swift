@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import os
 
 /// Local diagnostic messages for bug reports, read with `log show` or Console. They record what

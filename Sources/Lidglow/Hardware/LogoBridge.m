@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #import "LogoBridge.h"
 #import <IOKit/IOKitLib.h>
 #import <dlfcn.h>

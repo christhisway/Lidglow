@@ -1,4 +1,5 @@
 #!/bin/zsh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Builds, signs, and verifies Lidglow.app. Usage: Scripts/build.sh [destination]
 # A relative destination is resolved against the repository root. Default: build/Lidglow.app
 set -eu
