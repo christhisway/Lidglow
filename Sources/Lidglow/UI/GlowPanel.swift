@@ -21,6 +21,9 @@ struct GlowPanel: View {
             // A height preference read through a background GeometryReader only reported once in a
             // hosting controller sized by hand, so use a geometry observer, which fires on every change.
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { onHeightChange($0) }
+            // Pin the content to the top. Otherwise SwiftUI briefly centers new content in the old window
+            // height and animates that offset away, so the mode switcher and everything above it moved.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var content: some View {

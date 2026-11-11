@@ -98,16 +98,13 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
                 self.positionPanel(contentHeight: height, animate: true)
             }))
             host.sizingOptions = []
+            // No scroll view: the panel always fits its content, and scrolling only ever revealed empty
+            // space. The flipped container keeps the content pinned to the top while the window's
+            // bottom edge moves.
             let document = TopAnchoredView()
             document.addSubview(host.view)
-            let scroll = NSScrollView()
-            scroll.drawsBackground = false
-            scroll.hasVerticalScroller = true
-            scroll.scrollerStyle = .overlay
-            scroll.autohidesScrollers = true
-            scroll.documentView = document
             let container = NSViewController()
-            container.view = MenuPanel.backdrop(containing: scroll)
+            container.view = MenuPanel.backdrop(containing: document)
             container.addChild(host)
 
             let panel = MenuPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
@@ -125,11 +122,6 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         }
         model.panelVisible = true
         guard positionPanel(), let panel else { model.panelVisible = false; return }
-        if let scroll = host?.view.enclosingScrollView, let document = scroll.documentView {
-            let top = document.isFlipped ? 0 : max(0, document.frame.height - scroll.contentView.bounds.height)
-            scroll.contentView.scroll(to: NSPoint(x: 0, y: top))
-            scroll.reflectScrolledClipView(scroll.contentView)
-        }
         panel.makeKeyAndOrderFront(nil)
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) {
             [weak self] event in
@@ -168,19 +160,19 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     /// change follows the panel's own SwiftUI animation, keeping the top edge pinned under the icon.
     @discardableResult
     private func positionPanel(contentHeight: CGFloat? = nil, animate: Bool = false) -> Bool {
-        guard let panel, let host, let document = host.view.superview, let button = item?.button,
+        guard let panel, let host, let button = item?.button,
               let menuWindow = button.window, let screen = menuWindow.screen else { return false }
         let anchor = menuWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let visible = screen.visibleFrame.insetBy(dx: 6, dy: 6)
         let top = min(visible.maxY, anchor.minY - 6)
         guard top > visible.minY, visible.width > 0 else { return false }
         let width = min(350, visible.width)
-        let natural = ceil(contentHeight ?? host.sizeThatFits(in: NSSize(width: width, height: 10_000)).height)
+        // The content is pinned to the top of a flexible frame, so propose no height to get its natural one.
+        let natural = ceil(contentHeight ?? host.sizeThatFits(in: NSSize(width: width, height: 0)).height)
         guard natural > 0 else { return false }
         let height = min(natural, top - visible.minY)
         let x = min(max(anchor.midX - width / 2, visible.minX), visible.maxX - width)
         let frame = NSRect(x: x, y: top - height, width: width, height: height)
-        document.setFrameSize(NSSize(width: width, height: natural))
         host.view.frame = NSRect(x: 0, y: 0, width: width, height: natural)
         guard animate, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
               panel.frame.height != height else {
