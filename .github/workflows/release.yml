@@ -187,7 +187,7 @@ jobs:
             run_link="[run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
             commit_link="[\`${GITHUB_SHA:0:7}\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA)"
             if [[ "$SIGN_IDENTITY" == "-" ]]; then
-              echo "Built from $commit_link by the Release workflow ($run_link) with \`Scripts/package.sh\`. It's signed ad hoc, so macOS asks for System Audio Recording permission again after you update."
+              echo "Built from $commit_link by the Release workflow ($run_link) with \`Scripts/package.sh\`. It's signed ad hoc, so macOS asks for System Audio Recording permission again after you update. Open at Login might also turn off after an update. If it does, turn it back on in Settings → General."
             else
               echo "Built from $commit_link by the Release workflow ($run_link) with \`LIDGLOW_SIGN_IDENTITY=\"$SIGN_IDENTITY\" Scripts/package.sh\`."
             fi

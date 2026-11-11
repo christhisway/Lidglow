@@ -4,7 +4,7 @@ Releases go on [GitHub Releases](https://github.com/christhisway/Lidglow/release
 
 ## Signing
 
-Until the signing secrets below are added, the workflow signs releases **ad hoc**. That works, but an ad hoc signature changes with every build, so macOS asks users for System Audio Recording (and, if they use it, Microphone) permission again after each update. The release notes say so. Adding a stable identity is tracked post-beta in #69.
+Until the signing secrets below are added, the workflow signs releases **ad hoc**. That works, but an ad hoc signature changes with every build, so macOS asks users for System Audio Recording (and, if they use it, Microphone) permission again after each update. macOS might also treat the updated app as a new login item and turn Open at Login off. That hasn't been tested yet. The release notes mention both. Adding a stable identity is tracked post-beta in #69.
 
 ### Optional: a stable signing identity
 
@@ -32,7 +32,7 @@ Always export the same identity. A new certificate changes the app's designated 
    - Stable releases use three numbers with no suffix: 1.0 is `v1.0.0`.
 5. The workflow stops without releasing anything if the tag doesn't match `Info.plist`, the tag or release already exists, only one of the two signing secrets is set, the zip lacks `LICENSE`, the signature isn't the expected one (`Lidglow Self-Signed` with the secrets, ad hoc without them), or the built app's release label doesn't match the tag. Otherwise it creates a **draft** release from the exact commit it built, titled for example **Lidglow 0.9.0 Beta 1**, with both files attached and the notes filled in from the template below. Betas (`LidglowReleaseLabel` is `Beta`) are always marked as pre-releases, and stable releases never are.
 6. Open the draft on the Releases page, read the notes, and click **Publish release**. Publishing creates the tag. A repository ruleset lets only admins create, move, or delete `v*` tags, which is why the workflow stops at a draft: it runs as `github-actions[bot]`, which can't create the tag.
-7. Test the update on a Mac that has the previous version: run the install command from the release notes, then confirm that Lidglow reopens, controls the logo, and Music doesn't ask for permission again.
+7. Test the update on a Mac that has the previous version: run the install command from the release notes, then confirm that Lidglow reopens, controls the logo, and Music doesn't ask for permission again. If Open at Login was on, check that it's still on in Settings → General and that Lidglow opens after a restart.
 
 ### Pre-releases and the install command
 
@@ -71,7 +71,7 @@ click Open Anyway in System Settings → Privacy & Security.
 
 SHA-256 of Lidglow.zip: `<paste from Lidglow.zip.sha256>`
 
-Built from <commit link> with `Scripts/package.sh`. It's signed ad hoc, so macOS asks for System Audio Recording permission again after you update.
+Built from <commit link> with `Scripts/package.sh`. It's signed ad hoc, so macOS asks for System Audio Recording permission again after you update. Open at Login might also turn off after an update. If it does, turn it back on in Settings → General.
 ```
 
 With a stable identity, the last line instead reads:
