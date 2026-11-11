@@ -8,7 +8,8 @@ import Foundation
 /// 6 kHz. Each is a little tighter than the usual mixing ranges, so neighboring instruments leak in as
 /// little as possible. A hit in one of these bands only counts when that band carries a real share of
 /// the onset across the whole mix (see `share`), so a guitar strum's sliver of low end doesn't flash the
-/// logo in Bass. Full is the original wide detector, unchanged.
+/// logo in Bass, and only when the band itself is loud enough (see `loudness`), so a quiet rumble such as
+/// a breath in a vocal can't count as a hit just because it rose above an even quieter moment. Full is the original wide detector, unchanged.
 enum EQPreset: String, CaseIterable {
     case bass = "Bass"
     case mids = "Mids"
@@ -128,11 +129,19 @@ struct BeatMeter {
         hatFilters = [Biquad(highPass: 6000, sampleRate: sampleRate), Biquad(highPass: 6000, sampleRate: sampleRate)]
     }
 
-    /// The fraction of the whole mix's onset energy that falls in this band, mapped so that under 15%
-    /// counts for nothing and over 50% counts fully.
+    /// The fraction of the whole mix's onset energy that falls in this band, mapped so that under 10%
+    /// counts for nothing and over 30% counts fully.
     private func share(_ band: Band) -> Float {
         let fraction = band.transientEnergy / max(mixBand.transientEnergy, band.transientEnergy, 1e-12)
-        return min(1, max(0, (fraction - 0.15) / 0.35))
+        return min(1, max(0, (fraction - 0.10) / 0.20))
+    }
+
+    /// A minimum level for the band itself, in dB relative to full scale: nothing at `quiet`, fully at
+    /// `loud`. Mastered kicks reach about -10 dBFS in their band, while a breath or room rumble sits
+    /// around -40 dBFS or lower.
+    private static func loudness(_ rms: Double, quiet: Double, loud: Double) -> Float {
+        let decibels = 20 * log10(max(rms, 1e-9))
+        return Float(min(1, max(0, (decibels - quiet) / (loud - quiet))))
     }
 
     mutating func process(_ samples: UnsafePointer<Float>, frames: Int, channels: Int) -> Double {
@@ -185,14 +194,18 @@ struct BeatMeter {
         let drums = drumBand.onset(sqrt(drumEnergy / count), dt: dt)
         let treble = trebleBand.onset(sqrt(trebleEnergy / count), dt: dt)
         _ = mixBand.onset(Float((mixEnergy / Double(frames)).squareRoot()), dt: dt)
-        let kick = kickBand.onset(Float((kickEnergy / Double(frames)).squareRoot()), dt: dt)
-        let voice = voiceBand.onset(Float((voiceEnergy / Double(frames)).squareRoot()), dt: dt)
-        let hat = hatBand.onset(Float((hatEnergy / Double(frames)).squareRoot()), dt: dt)
+        let kickLevel = (kickEnergy / Double(frames)).squareRoot()
+        let voiceLevel = (voiceEnergy / Double(frames)).squareRoot()
+        let hatLevel = (hatEnergy / Double(frames)).squareRoot()
+        let kick = kickBand.onset(Float(kickLevel), dt: dt)
+        let voice = voiceBand.onset(Float(voiceLevel), dt: dt)
+        let hat = hatBand.onset(Float(hatLevel), dt: dt)
         let hit: Float
         switch preset {
-        case .bass: hit = kick * share(kickBand)
-        case .mids: hit = voice * share(voiceBand)
-        case .treble: hit = hat * share(hatBand)
+        case .bass: hit = kick * share(kickBand) * Self.loudness(kickLevel, quiet: -40, loud: -28)
+        case .mids: hit = voice * share(voiceBand) * Self.loudness(voiceLevel, quiet: -42, loud: -30)
+        // Cymbals carry much less energy than kicks, so their floor sits lower.
+        case .treble: hit = hat * share(hatBand) * Self.loudness(hatLevel, quiet: -48, loud: -36)
         case .flat: hit = max(bass, drums * 0.85, treble * 0.85)
         }
         envelope = max(hit, envelope * Float(exp(-dt / 0.095)))
