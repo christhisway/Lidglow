@@ -13,6 +13,12 @@ If Music remains on “Waiting for music” during playback, use **System Audio 
 
 Audio processing runs locally through a private Core Audio tap. The app reduces playback to a level driven by bass and drum hits and discards the samples. Hardware modes pause when the session locks, the display sleeps, or the lid closes. Older Macs can use the in-panel preview.
 
+## Updating
+
+Lidglow never checks for updates itself, because it has no network code. New versions are posted on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with release notes, also kept in [CHANGELOG.md](CHANGELOG.md). To be notified, click **Watch → Custom → Releases** on the repository page. **Settings → About → View Releases** opens the page in your browser.
+
+To update, quit Lidglow from the panel or its Control-click menu so it hands the logo back to macOS, then replace `Lidglow.app` with the new version and open it. Because this build is ad-hoc signed, macOS may ask for System Audio Recording permission again after an update.
+
 ## Project layout
 
 ```

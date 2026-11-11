@@ -49,6 +49,7 @@ private struct SettingsView: View {
 enum ProjectLinks {
     static let repository = URL(string: "https://github.com/christhisway/Lidglow")!
     static let readme = URL(string: "https://github.com/christhisway/Lidglow#readme")!
+    static let releases = URL(string: "https://github.com/christhisway/Lidglow/releases")!
 }
 
 private struct AboutSection: View {
@@ -73,6 +74,12 @@ private struct AboutSection: View {
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
+            }
+            LabeledContent {
+                Link("View Releases", destination: ProjectLinks.releases)
+            } label: {
+                Text("Updates")
+                Text("Lidglow doesn’t check for updates itself. New versions are posted on GitHub.")
             }
             Link("Read Me", destination: ProjectLinks.readme)
             Link("Source Code on GitHub", destination: ProjectLinks.repository)
