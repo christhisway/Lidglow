@@ -10,14 +10,47 @@ final class GlowModel: ObservableObject {
     @Published private(set) var level = 0.0
     @Published private(set) var status = "Checking lid hardware…"
     @Published private(set) var audioError = false
-    @Published var brightness = UserDefaults.standard.object(forKey: "brightness") as? Double ?? 0.82 {
-        didSet {
-            // The far left of the slider turns the logo off, so snap a near-zero drag to exactly zero.
-            if brightness != 0 && brightness < 0.01 { brightness = 0 }
-            UserDefaults.standard.set(brightness, forKey: "brightness")
-            updateIcon()
-            speedUp()
+    /// Each mode keeps its own brightness, so turning Standard off doesn't leave Breathe or Music (or an
+    /// automatic switch to Music) dark. Saved per mode.
+    @Published private var brightnessByMode = Dictionary(uniqueKeysWithValues: GlowMode.allCases.map {
+        ($0, GlowModel.savedBrightness(for: $0))
+    })
+    /// The selected mode's brightness, which the panel's Brightness slider shows and sets.
+    var brightness: Double {
+        get { brightness(for: mode) }
+        set { setBrightness(newValue, for: mode) }
+    }
+    /// The selected mode's slider range. Only Standard can turn the logo off. Breathe and Music keep a
+    /// 5% floor, so they always glow.
+    var brightnessRange: ClosedRange<Double> { Self.minimumBrightness(for: mode)...1 }
+
+    func brightness(for mode: GlowMode) -> Double { brightnessByMode[mode] ?? Self.defaultBrightness }
+
+    private func setBrightness(_ value: Double, for mode: GlowMode) {
+        var value = min(1, max(Self.minimumBrightness(for: mode), value))
+        // The far left of Standard's slider turns the logo off, so snap a near-zero drag to exactly zero.
+        if mode == .standard && value < 0.01 { value = 0 }
+        brightnessByMode[mode] = value
+        UserDefaults.standard.set(value, forKey: Self.brightnessKey(for: mode))
+        updateIcon()
+        speedUp()
+    }
+
+    private static let defaultBrightness = 0.82
+    static func minimumBrightness(for mode: GlowMode) -> Double { mode == .standard ? 0 : 0.05 }
+    private static func brightnessKey(for mode: GlowMode) -> String { "brightness.\(mode.rawValue)" }
+
+    /// Before each mode had its own brightness, one shared value was saved as "brightness". Each mode
+    /// starts from it, raised to the mode's floor. If it was off, Breathe and Music start at the default.
+    private static func savedBrightness(for mode: GlowMode) -> Double {
+        let defaults = UserDefaults.standard
+        let floor = minimumBrightness(for: mode)
+        if let saved = defaults.object(forKey: brightnessKey(for: mode)) as? Double {
+            return min(1, max(floor, saved))
         }
+        let shared = defaults.object(forKey: "brightness") as? Double ?? defaultBrightness
+        if shared == 0 && floor > 0 { return defaultBrightness }
+        return min(1, max(floor, shared))
     }
     @Published var sensitivity = UserDefaults.standard.object(forKey: "sensitivity") as? Double ?? 1.0 {
         didSet { UserDefaults.standard.set(sensitivity, forKey: "sensitivity") }
@@ -218,7 +251,7 @@ final class GlowModel: ObservableObject {
         // and Off and Steady are both Standard, with Off at zero brightness.
         switch saved {
         case "System": defaults.set(false, forKey: Self.enabledKey); saved = nil
-        case "Off": brightness = 0; saved = GlowMode.standard.rawValue
+        case "Off": setBrightness(0, for: .standard); saved = GlowMode.standard.rawValue
         case "Steady": saved = GlowMode.standard.rawValue
         default: break
         }
