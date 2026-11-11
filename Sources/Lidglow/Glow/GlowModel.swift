@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Combine
 import os
 
@@ -41,7 +42,8 @@ final class GlowModel: ObservableObject {
         }
     }
 
-    /// Where Music mode gets its sound. Chosen apps by default. Set it through `selectMusicSource(_:)`.
+    /// Where Music mode gets its sound. Chosen apps by default. The microphone is only ever opened when
+    /// the user picks it here and macOS has granted access. Set it through `selectMusicSource(_:)`.
     @Published private(set) var musicSource = UserDefaults.standard.string(forKey: "musicSource")
         .flatMap(MusicSource.init(rawValue:)) ?? .chosenApps {
         didSet {
@@ -49,6 +51,8 @@ final class GlowModel: ObservableObject {
             applyMusicSource()
         }
     }
+    /// The user picked Microphone, but macOS doesn't allow Lidglow to use it.
+    @Published private(set) var microphoneDenied = false
     static let defaultMusicApps = ["com.spotify.client", "com.apple.Music"]
     /// Bundle IDs of the apps Music listens to when the source is `.chosenApps`.
     @Published var musicApps = UserDefaults.standard.stringArray(forKey: "musicApps") ?? GlowModel.defaultMusicApps {
@@ -62,19 +66,36 @@ final class GlowModel: ObservableObject {
         switch musicSource {
         case .chosenApps: return .apps(Set(musicApps))
         case .allApps: return .allApps
+        case .microphone: return .microphone
         }
     }
 
     private func applyMusicSource() {
         music.source = musicInput
-        // Clear an error from the previous source, so the next tick starts the new one.
+        // Clear an error from the previous source, such as revoked microphone access, so the next tick
+        // starts the new one.
         if audioError && mode == .music { audioError = false; music.stop() }
         speedUp()
     }
 
-    /// Switches Music's source.
+    /// Switches Music's source. Choosing the microphone asks macOS for access the first time, and only
+    /// switches once it's granted.
     func selectMusicSource(_ source: MusicSource) {
-        musicSource = source
+        microphoneDenied = false
+        guard source == .microphone else { musicSource = source; return }
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            musicSource = .microphone
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    if granted { self.musicSource = .microphone } else { self.microphoneDenied = true }
+                }
+            }
+        default:
+            microphoneDenied = true
+        }
     }
 
     @Published var idleGlow = UserDefaults.standard.bool(forKey: "idleGlow") {
@@ -332,10 +353,13 @@ final class GlowModel: ObservableObject {
                 switch musicSource {
                 case .chosenApps: label = "Reacting to your music apps"
                 case .allApps: label = "Reacting to system audio"
+                case .microphone: label = "Reacting to the microphone"
                 }
             } else if music.waitingForApps {
                 label = musicApps.isEmpty ? "No music apps chosen · Choose them in Settings"
                                           : "Waiting for music · Open a music app chosen in Settings"
+            } else if musicSource == .microphone {
+                label = "Waiting for sound · Listening to the microphone"
             } else {
                 label = "Waiting for music · Play something on your Mac"
             }
@@ -393,8 +417,10 @@ final class GlowModel: ObservableObject {
         if status != value { status = value }
     }
 
+    /// Opens the privacy pane for the current source: Microphone, or Screen & System Audio Recording.
     func openAudioSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture") {
+        let pane = musicSource == .microphone ? "Privacy_Microphone" : "Privacy_AudioCapture"
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") {
             NSWorkspace.shared.open(url)
         }
     }
