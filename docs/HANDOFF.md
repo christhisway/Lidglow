@@ -9,6 +9,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 - Music uses a private Core Audio process tap to meter system playback, with separate bass and drum transient detection. It uses no microphone, stores no recordings, and has no network code.
 - Idle glow sets a base between hits and tracks, capped at 90% of the chosen peak so beats can still brighten the logo. The preview and physical LED both glow white.
 - Each opening of the panel replays the laptop animation, then switches to a 2D logo that follows the live brightness. Reduce Motion goes directly to the 2D view.
+- While a known logo utility (Backglow `co.supershort.backglow`, LogoLight `app.logolight.LogoLight`) is running, Lidglow doesn't take control, shows which app has the logo, and takes over when it quits. If a settled logo is moved away from its target four times within 20 seconds by something else, Lidglow restores the logo and asks the user to quit the other app.
 - Music and logo control pause on session lock, sleep, or lid closure. Normal quit restores macOS control. Unsupported hardware uses the preview.
 
 ## Source map
@@ -28,6 +29,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `Audio/SystemMusic.swift` | Core Audio tap lifecycle |
 | `Audio/BeatMeter.swift` | Bass and drum transient detection |
 | `Hardware/LidLogo.swift` | Logo brightness transitions, original state tracking, and restoration |
+| `Hardware/OtherLogoApps.swift` | Watches launch and quit notifications for known logo utilities (Backglow, LogoLight) |
 | `Hardware/LaptopFinish.swift` | Automatic laptop finish detection |
 | `Hardware/LogoBridge.h`, `.m` | IOKit hardware detection and dynamically loaded CoreBrightness calls |
 | `Resources/Info.plist` | Version, bundle ID, menu-bar activation, deployment target, and audio permission text |

@@ -4,7 +4,7 @@ Lidglow is a native macOS menu-bar app for the illuminated Apple logo on MacBook
 
 ## Use Lidglow
 
-1. Quit Backglow or any other utility controlling the lid logo so that only one app sends brightness commands.
+1. Quit Backglow, LogoLight, or any other utility controlling the lid logo so that only one app sends brightness commands. While Backglow or LogoLight is running, Lidglow leaves the logo alone and says so in its panel. It takes over when they quit. If another app keeps changing the logo while Lidglow holds it, Lidglow hands the logo back to macOS and asks you to quit that app.
 2. Open **Lidglow.app** in Finder. Click the waveform circle in the macOS menu bar to open its controls, and turn on the switch in the panel's top-right corner. Control-click or right-click the icon for **Open Settings…** and **Quit Lidglow**.
 3. Choose **Music**, allow macOS system audio capture when prompted, and play music. **Brightness** sets the peak glow and **Sensitivity** adjusts how strongly bass and drum hits drive it. Turn on **Idle glow** to keep a base between beats and tracks. Use **Idle brightness** to raise or lower it.
 4. Turn the switch off to hand brightness back to macOS. **Standard** holds the logo at the chosen brightness (drag **Brightness** all the way down to turn it off), and **Breathe** fades it slowly.
@@ -21,7 +21,7 @@ Sources/Lidglow/
   Glow/       Glow modes and the model that drives the logo each tick
   UI/         SwiftUI controls, shared Liquid Glass styling, the borderless menu panel, the Settings window, and the animated laptop preview
   Audio/      Core Audio process tap and the BeatMeter detector
-  Hardware/   Lid logo control, laptop finish detection, and the Objective-C CoreBrightness bridge
+  Hardware/   Lid logo control, detection of other logo apps, laptop finish detection, and the Objective-C CoreBrightness bridge
   Resources/  Info.plist
 Tests/BeatMeterTests/  Synthetic beat detector check
 Scripts/      build.sh and test.sh

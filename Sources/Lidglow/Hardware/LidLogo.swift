@@ -14,6 +14,10 @@ final class LidLogo {
     private let settledRecheck = 0.5
     var isSettled: Bool { settledTarget != nil }
     private(set) var measuredLevel = 0.0
+    // Something else moving a settled logo away from its target, again and again, means another app
+    // is fighting Lidglow. This builds on the settled re-read, so it costs no extra hardware reads.
+    private var interference: [Double] = []
+    private(set) var interferenceDetected = false
     var onRiseFromDark: (() -> Void)?
 
     var available: Bool { bridge.mode >= 0 && bridge.level.isFinite }
@@ -35,6 +39,8 @@ final class LidLogo {
         guard mode >= 0, bridge.level.isFinite else { return false }
         if mode == 0 && !bridge.enableLogo(true) { return false }
         originalMode = mode
+        interference = []
+        interferenceDetected = false
         direction = nil
         holding = false
         lastChange = -.infinity
@@ -64,10 +70,12 @@ final class LidLogo {
     func follow(_ target: Double, now: Double, rise: Double, fall: Double, tolerance: Double = 0.045) -> Bool {
         guard originalMode != nil else { return false }
         if target == settledTarget && now < nextSettledCheck { return true }
+        let wasSettled = target == settledTarget
         settledTarget = nil
         let level = bridge.level
         guard level.isFinite else { return false }
         measuredLevel = min(1, max(0, level))
+        if wasSettled && abs(level - target) > max(0.06, tolerance * 2) { noteInterference(now) }
         let delta = target - level
         if abs(delta) <= tolerance || (target == 0 && direction == false && !holding) {
             let needsHold = !holding && target > 0 && target < 1 && direction != nil
@@ -101,6 +109,12 @@ final class LidLogo {
         let duration = min(3, (rising ? rise : fall) / max(0.05, high))
         if rising && level < 0.04 { onRiseFromDark?() }
         return command(rising, duration: duration, hold: false, now: now)
+    }
+
+    /// Four unexplained moves within 20 seconds count as another app controlling the logo.
+    private func noteInterference(_ now: Double) {
+        interference = interference.filter { now - $0 < 20 } + [now]
+        if interference.count >= 4 { interferenceDetected = true }
     }
 
     private func command(_ lit: Bool, duration: Double, hold: Bool, now: Double) -> Bool {
