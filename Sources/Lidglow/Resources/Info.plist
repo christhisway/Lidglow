@@ -7,9 +7,10 @@
     <key>CFBundleDisplayName</key><string>Lidglow</string>
     <key>CFBundleExecutable</key><string>Lidglow</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>1.0</string>
-    <key>CFBundleVersion</key><string>1</string>
-    <key>LSMinimumSystemVersion</key><string>14.2</string>
+    <key>CFBundleShortVersionString</key><string>0.9.0</string>
+    <key>CFBundleVersion</key><string>2</string>
+    <key>LidglowReleaseLabel</key><string>Beta</string>
+    <key>LSMinimumSystemVersion</key><string>27.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHumanReadableCopyright</key><string>Copyright © 2026 christhisway and Lidglow contributors. Licensed under the GNU GPL v3 or later.</string>
     <key>NSAudioCaptureUsageDescription</key>

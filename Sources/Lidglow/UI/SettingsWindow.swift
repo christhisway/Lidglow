@@ -286,6 +286,11 @@ private struct AboutSection: View {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "?"
         let build = info?["CFBundleVersion"] as? String ?? "?"
+        // A pre-release names its stage after the version, for example "0.9.0 Beta (2)". A stable release
+        // leaves `LidglowReleaseLabel` out of Info.plist.
+        if let label = info?["LidglowReleaseLabel"] as? String, !label.isEmpty {
+            return "\(short) \(label) (\(build))"
+        }
         return "\(short) (\(build))"
     }
 

@@ -2,6 +2,8 @@
 
 Lidglow is a native macOS menu-bar app for the illuminated Apple logo on MacBook Pro with PROLED XDR Display. The included app is an ad-hoc signed Apple silicon build.
 
+**Lidglow is in beta.** Beta versions are numbered 0.9.x, show **Beta** in **Settings → About**, and are marked as pre-releases on [GitHub Releases](https://github.com/christhisway/Lidglow/releases). 1.0 will be the first stable release. Please [report anything that goes wrong](#reporting-bugs).
+
 ## Requirements
 
 | | Support |
@@ -9,13 +11,13 @@ Lidglow is a native macOS menu-bar app for the illuminated Apple logo on MacBook
 | **MacBook Pro with PROLED XDR display** | Full control of the illuminated lid logo |
 | **Other Apple silicon Macs** | Preview only. The panel shows an on-screen preview and never sends anything to the hardware. The status line says why. |
 | **Intel Macs** | Not supported. Lidglow is built for Apple silicon only and won't open. |
-| **macOS** | 14.2 or later. Tested on macOS 27. macOS 14, 15, and 26 haven't been tested yet. |
+| **macOS** | 27 or later. Every MacBook Pro with a light-up Apple logo ships with macOS 27 or later. On an older macOS, macOS won't open Lidglow. |
 
 Logo control uses a private macOS interface, so a macOS update can stop it working. If that happens, Lidglow shows “Lid logo service unavailable” and switches to the preview instead of controlling the logo.
 
 ## Install
 
-Lidglow needs a Mac with Apple silicon and macOS 14.2 or later. Run this in Terminal:
+Lidglow needs a Mac with Apple silicon and macOS 27 or later. Run this in Terminal:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash
