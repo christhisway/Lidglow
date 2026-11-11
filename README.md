@@ -23,7 +23,13 @@ Lidglow needs a Mac with Apple silicon and macOS 27 or later. Run this in Termin
 curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash
 ```
 
-The script checks your Mac, downloads the latest release from GitHub Releases, verifies its SHA-256 checksum, quits any running Lidglow normally so the logo goes back to macOS, installs `Lidglow.app` in `/Applications` (or `~/Applications` if `/Applications` isn't writable), and opens it. Run the same command again to update. It doesn't use `sudo`.
+Until 1.0 is out there's no stable release, so install a beta by adding its version after `bash -s --`. Find the versions on [GitHub Releases](https://github.com/christhisway/Lidglow/releases):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash -s -- v0.9.0-beta.1
+```
+
+The script checks your Mac, downloads the latest stable release (or the version you named) from GitHub Releases, verifies its SHA-256 checksum, quits any running Lidglow normally so the logo goes back to macOS, installs `Lidglow.app` in `/Applications` (or `~/Applications` if `/Applications` isn't writable), and opens it. Run the command again to update: with a newer version to move to that beta, or with no version for the latest stable release. It doesn't use `sudo`.
 
 To read the script before running it:
 
@@ -75,7 +81,7 @@ Audio processing runs locally through a private Core Audio tap. The app reduces 
 
 Lidglow never checks for updates itself, because it has no network code. New versions are posted on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with release notes, also kept in [CHANGELOG.md](docs/CHANGELOG.md). To be notified, click **Watch → Custom → Releases** on the repository page. **Settings → About → View Releases** opens the page in your browser.
 
-To update, run the [install command](#install) again. It quits Lidglow normally so it hands the logo back to macOS, then replaces the app and opens it. If you installed by hand, quit Lidglow from the panel or its Control-click menu, then replace `Lidglow.app` with the new version and open it. An ad-hoc signed build may ask for System Audio Recording or Microphone permission again after an update.
+To update, run the [install command](#install) again, adding the new version if you're on a beta. It quits Lidglow normally so it hands the logo back to macOS, then replaces the app and opens it. If you installed by hand, quit Lidglow from the panel or its Control-click menu, then replace `Lidglow.app` with the new version and open it. An ad-hoc signed build may ask for System Audio Recording or Microphone permission again after an update.
 
 ## Privacy
 

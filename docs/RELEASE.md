@@ -1,6 +1,6 @@
 # Releasing Lidglow
 
-Releases go on [GitHub Releases](https://github.com/christhisway/Lidglow/releases). `Scripts/install.sh` downloads the two files each release must have: `Lidglow.zip` and `Lidglow.zip.sha256`. The **Release** workflow (`.github/workflows/release.yml`) builds them from `main` and creates the release. It runs only when you start it.
+Releases go on [GitHub Releases](https://github.com/christhisway/Lidglow/releases). `Scripts/install.sh` downloads the two files each release must have: `Lidglow.zip` and `Lidglow.zip.sha256`. The **Release** workflow (`.github/workflows/release.yml`) builds them from `main` and creates the release as a draft. It runs only when you start it.
 
 ## One-time setup
 
@@ -26,15 +26,13 @@ Always export the same identity. A new certificate changes the app's designated 
 4. In **Actions → Release → Run workflow**, keep the branch on `main` and enter the tag:
    - Betas: `v0.9.0-beta.1`, `v0.9.0-beta.2`, and so on.
    - Stable releases use three numbers with no suffix: 1.0 is `v1.0.0`.
-
-   Leave **Publish right away** off to get a draft. Leave **Mark as a GitHub pre-release** off (see below).
-5. The workflow stops without releasing anything if the tag doesn't match `Info.plist`, the tag or release already exists, the signing secrets are missing, the zip lacks `LICENSE`, or the app isn't signed by `Lidglow Self-Signed`. Otherwise it creates the release from the exact commit it built, titled for example **Lidglow 0.9.0 Beta 1**, with both files attached and the notes filled in from the template below.
-6. Open the draft on the Releases page, read the notes, and click **Publish release**. Publishing creates the tag.
-7. Test the update on a Mac that has the previous version: run the install command, then confirm that Lidglow reopens, controls the logo, and Music doesn't ask for permission again.
+5. The workflow stops without releasing anything if the tag doesn't match `Info.plist`, the tag or release already exists, the signing secrets are missing, the zip lacks `LICENSE`, or the app isn't signed by `Lidglow Self-Signed`. Otherwise it creates a **draft** release from the exact commit it built, titled for example **Lidglow 0.9.0 Beta 1**, with both files attached and the notes filled in from the template below. Betas (`LidglowReleaseLabel` is `Beta`) are always marked as pre-releases, and stable releases never are.
+6. Open the draft on the Releases page, read the notes, and click **Publish release**. Publishing creates the tag. A repository ruleset lets only admins create, move, or delete `v*` tags, which is why the workflow stops at a draft: it runs as `github-actions[bot]`, which can't create the tag.
+7. Test the update on a Mac that has the previous version: run the install command from the release notes, then confirm that Lidglow reopens, controls the logo, and Music doesn't ask for permission again.
 
 ### Pre-releases and the install command
 
-The install command downloads from `releases/latest`, and GitHub never counts drafts or pre-releases as the latest release. If every release so far is marked as a pre-release, the install command fails. So betas aren't marked as GitHub pre-releases: their title, tag, and Settings → About already say Beta. Only tick **Mark as a GitHub pre-release** for a test build that the install command should skip.
+The install command with no version installs GitHub's latest release, which never includes drafts or pre-releases. So betas are only installed by name (`… | bash -s -- v0.9.0-beta.1`), and every release's notes give the command with its own tag. Until 1.0 is out, the command with no version says there's no stable release yet and shows how to install a beta.
 
 ## Building a release locally
 
@@ -48,14 +46,14 @@ It packages whatever is checked out, including uncommitted changes, so don't upl
 
 ## Release notes template
 
-The workflow fills this in. For a release made by hand, use it as is:
+The workflow fills this in, replacing `<tag>` with the release's tag. For a release made by hand, use it the same way:
 
 ```markdown
 ## Install or update
 
 Run this in Terminal (it also updates an existing copy):
 
-    curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash -s -- <tag>
 
 Requires Apple silicon and macOS 27 or later. Lidglow isn't notarized by Apple. The Terminal
 installer opens it without a warning. If you download Lidglow.zip in a browser, open it once, then
