@@ -45,6 +45,7 @@ private struct SettingsView: View {
         Form {
             GeneralSection()
             MusicSection(model: model)
+            AgentsSection(model: model)
             AboutSection()
         }
         .formStyle(.grouped)

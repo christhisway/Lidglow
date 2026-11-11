@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import AppKit
+import os
 import SwiftUI
 
 /// Holds the panel's SwiftUI content at the top, so the content stays put while the window's height
@@ -68,6 +69,19 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         false
+    }
+
+    /// Agent hooks run `open -g "lidglow://agent/attention?agent=claude-code"`, which arrives here without
+    /// bringing Lidglow to the front. It's the only way in: no network listener. Any app can open these
+    /// links, so `AgentRequest` accepts only known signals and agents. Anything else is dropped, and its contents aren't logged.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard let request = AgentRequest(url: url) else {
+                Logger.agents.notice("Ignored a link that isn't a known agent signal")
+                continue
+            }
+            model.receive(request)
+        }
     }
 
     private func setIcon(lit: Bool) {

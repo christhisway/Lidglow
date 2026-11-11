@@ -42,12 +42,12 @@ Lidglow uses the documented Core Audio tap interface and a dynamically loaded, p
 
 ```
 Sources/Lidglow/
-  App/        Entry point, application delegate (status item, panel window), local log categories, and the Check for Updates runner
-  Glow/       Glow modes and the model that drives the logo each tick
-  UI/         SwiftUI controls, shared Liquid Glass styling, the borderless menu panel, the Settings window, and the animated laptop preview
+  App/        Entry point, application delegate (status item, panel window, agent links), local log categories, and the Check for Updates runner
+  Glow/       Glow modes, agent alerts (supported agents, link parsing, the pulse, and clicks in an agent's app), and the model that drives the logo each tick
+  UI/         SwiftUI controls, shared Liquid Glass styling, the borderless menu panel, the Settings window and its Agents section, and the animated laptop preview
   Audio/      Core Audio process tap, the playback watcher for automatic switching to Music, and the BeatMeter detector
   Hardware/   Lid logo control, detection of other apps controlling the logo, laptop finish detection, and the Objective-C CoreBrightness bridge
-  Resources/  Info.plist and the entitlements used for Developer ID (hardened-runtime) signing
+  Resources/  Info.plist (including the lidglow URL scheme) and the entitlements used for Developer ID (hardened-runtime) signing
 Tests/BeatMeterTests/  Synthetic beat detector check
 Scripts/      build.sh, test.sh, package.sh (release zip and checksum), install.sh (the Terminal installer, also bundled in the app for Check for Updates), and uninstall.sh
 docs/         Architecture notes (behavior, source map, manual checks), the release checklist, the changelog, and the contributing, security, and privacy notes
