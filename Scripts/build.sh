@@ -19,10 +19,15 @@ xcrun clang -target "$target" -isysroot "$sdk" -fobjc-arc -O2 \
 xcrun swiftc -target "$target" -sdk "$sdk" -module-cache-path "$module_cache" -O \
     -import-objc-header "$src/Hardware/LogoBridge.h" "$src"/**/*.swift "$cache/LogoBridge.o" \
     -framework IOKit -o "$destination/Contents/MacOS/Lidglow"
+# Ad hoc by default. A self-signed identity (for example "Lidglow Self-Signed") gives every release the
+# same designated requirement, so macOS keeps the audio permission across updates. Only a Developer ID
+# identity gets the hardened runtime and a secure timestamp, which notarization needs.
 sign_identity="${LIDGLOW_SIGN_IDENTITY:--}"
 sign_options=()
-if [[ "$sign_identity" != "-" ]]; then
-    sign_options=(--options runtime --timestamp)
+if [[ "$sign_identity" == "Developer ID Application"* ]]; then
+    # The hardened runtime blocks microphone input unless the app declares it. Lidglow only opens the
+    # microphone when the user chooses it as Music's source.
+    sign_options=(--options runtime --timestamp --entitlements "$src/Resources/Lidglow.entitlements")
 fi
 codesign --force --sign "$sign_identity" "${sign_options[@]}" "$destination"
 codesign --verify --strict "$destination"

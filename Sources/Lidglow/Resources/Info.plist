@@ -12,6 +12,8 @@
     <key>LSMinimumSystemVersion</key><string>14.2</string>
     <key>LSUIElement</key><true/>
     <key>NSAudioCaptureUsageDescription</key>
-    <string>Lidglow measures the bass in your Mac’s playback to animate the illuminated lid logo. Audio stays on your Mac and is never saved.</string>
+    <string>Lidglow turns your Mac’s audio output into a brightness level for the lid logo as it plays. Audio is never recorded, saved, or sent anywhere.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>When you choose Microphone in Music settings, Lidglow turns the sound around your Mac into a brightness level for the lid logo. Audio is never recorded, saved, or sent anywhere.</string>
 </dict>
 </plist>
