@@ -48,7 +48,7 @@ private struct SettingsView: View {
     }
 }
 
-/// Chooses where Music mode listens: the chosen apps or all apps. The app checklist
+/// Chooses where Music mode listens: the chosen apps, all apps, or the microphone. The app checklist
 /// opens in a sheet so the section stays short. Its list is gathered once when Settings opens: known
 /// music apps that are installed, the apps already chosen, and apps that are running now.
 private struct MusicSection: View {
@@ -74,6 +74,18 @@ private struct MusicSection: View {
                 }
                 .sheet(isPresented: $choosingApps) { MusicAppPicker(model: model, apps: apps) }
             }
+            if model.microphoneDenied {
+                LabeledContent {
+                    Button("Open Settings…") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                } label: {
+                    Text("Microphone access is off")
+                    Text("Allow Lidglow under Privacy & Security → Microphone, then choose Microphone again.")
+                }
+            }
         } header: {
             Text("Music")
         } footer: {
@@ -89,6 +101,8 @@ private struct MusicSection: View {
             return "Music mode reacts only to the apps you choose. Safari plays audio through a shared system process, so choose All apps to follow it."
         case .allApps:
             return "Music mode reacts to everything your Mac plays, including system sounds, videos, and calls."
+        case .microphone:
+            return "Music mode reacts to sound around your Mac. The microphone stays on while Music is running, and macOS shows its indicator. It turns off when you switch modes, lock your Mac, or close the lid. Lidglow never records or saves what it hears."
         }
     }
 
