@@ -5,7 +5,7 @@ import os
 
 final class GlowModel: ObservableObject {
     @Published private(set) var mode: GlowMode = .standard
-    /// Whether Lidglow drives the logo. Off hands the logo back to macOS, which was System mode in 1.0.
+    /// Whether Lidglow drives the logo. Off hands the logo back to macOS, which was System mode in build 1 (tagged v1.0).
     @Published private(set) var enabled = false
     @Published private(set) var level = 0.0
     @Published private(set) var status = "Checking lid hardware…"
@@ -247,7 +247,7 @@ final class GlowModel: ObservableObject {
     func restoreSelectedMode() {
         let defaults = UserDefaults.standard
         var saved = defaults.string(forKey: Self.modeKey)
-        // Lidglow 1.0 saved System, Off, and Steady as modes. System is now the switch turned off,
+        // Build 1 (tagged v1.0) saved System, Off, and Steady as modes. System is now the switch turned off,
         // and Off and Steady are both Standard, with Off at zero brightness.
         switch saved {
         case "System": defaults.set(false, forKey: Self.enabledKey); saved = nil

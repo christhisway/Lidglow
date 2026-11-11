@@ -2,6 +2,8 @@
 
 Lidglow is a native macOS menu-bar app for the illuminated Apple logo on MacBook Pro with PROLED XDR Display. The included app is an ad-hoc signed Apple silicon build.
 
+**Lidglow is in beta.** Beta versions are numbered 0.9.x, show **Beta** in **Settings → About**, and are marked as pre-releases on [GitHub Releases](https://github.com/christhisway/Lidglow/releases). 1.0 will be the first stable release. Please [report anything that goes wrong](#reporting-bugs).
+
 ## Requirements
 
 | | Support |
