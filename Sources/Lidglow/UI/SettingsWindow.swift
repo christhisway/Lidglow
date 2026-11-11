@@ -75,6 +75,10 @@ private struct MusicSection: View {
                     }
                 }
                 .sheet(isPresented: $choosingApps) { MusicAppPicker(model: model, apps: apps) }
+                Toggle(isOn: $model.autoMusic) {
+                    Text("Automatically switch to Music")
+                    Text("Switches to Music when a chosen app starts playing, and back a few seconds after it stops. Picking a mode yourself always wins.")
+                }
             }
             if model.microphoneDenied {
                 LabeledContent {
@@ -102,9 +106,9 @@ private struct MusicSection: View {
         case .chosenApps:
             return "Music mode reacts only to the apps you choose. Safari plays audio through a shared system process, so choose All apps to follow it."
         case .allApps:
-            return "Music mode reacts to everything your Mac plays, including system sounds, videos, and calls."
+            return "Music mode reacts to everything your Mac plays, including system sounds, videos, and calls. Automatic switching to Music needs Chosen apps."
         case .microphone:
-            return "Music mode reacts to sound around your Mac. The microphone stays on while Music is running, and macOS shows its indicator. It turns off when you switch modes, lock your Mac, or close the lid. Lidglow never records or saves what it hears."
+            return "Music mode reacts to sound around your Mac. The microphone stays on while Music is running, and macOS shows its indicator. It turns off when you switch modes, lock your Mac, or close the lid. Lidglow never records or saves what it hears. Automatic switching to Music needs Chosen apps."
         }
     }
 
