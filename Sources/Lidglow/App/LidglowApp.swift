@@ -10,6 +10,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     private var layoutChanges: AnyCancellable?
     private var localMonitor: Any?
     private var outsideMonitor: Any?
+    private var focusObservers: [(NotificationCenter, NSObjectProtocol)] = []
     private var settingsWindow: SettingsWindow?
     private lazy var contextMenu: NSMenu = {
         let menu = NSMenu()
@@ -137,6 +138,22 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             guard let self, !self.clickIsOnStatusItem() else { return }
             self.closePanel()
         }
+        // Touches on a touchscreen don't reach the mouse-down monitors above, but a touch anywhere else
+        // still moves key focus away from the panel, or activates another app. Close on either, like a
+        // menu does. These are notifications, so nothing runs until focus actually changes.
+        let resign = NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification,
+                                                            object: panel, queue: .main) { [weak self] _ in
+            guard let self, !self.clickIsOnStatusItem() else { return }
+            self.closePanel()
+        }
+        let workspace = NSWorkspace.shared.notificationCenter
+        let activate = workspace.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
+                                             object: nil, queue: .main) { [weak self] note in
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            guard let self, app != NSRunningApplication.current, !self.clickIsOnStatusItem() else { return }
+            self.closePanel()
+        }
+        focusObservers = [(NotificationCenter.default, resign), (workspace, activate)]
     }
 
     /// Clicks on the menu-bar icon belong to `statusItemClicked()`. If a monitor closed the panel on mouse-down,
@@ -167,6 +184,9 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     }
 
     private func closePanel() {
+        // Stop observing first: hiding the panel makes it resign key, which would call back in here.
+        for (center, observer) in focusObservers { center.removeObserver(observer) }
+        focusObservers = []
         panel?.orderOut(nil)
         model.panelVisible = false
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
