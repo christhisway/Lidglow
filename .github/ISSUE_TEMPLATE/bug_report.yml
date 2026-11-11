@@ -26,7 +26,7 @@ body:
     attributes:
       label: Lidglow version
       description: Click the gear in the Lidglow panel, or Control-click the menu-bar icon and choose Open Settings…. The version is under About.
-      placeholder: 1.0 (1)
+      placeholder: 0.9.0 Beta (2)
     validations:
       required: true
   - type: dropdown

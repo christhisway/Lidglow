@@ -12,9 +12,9 @@ Each release is also published on [GitHub Releases](https://github.com/christhis
 - An animated laptop preview that shows the live lid glow in your Mac's finish.
 
 ### Changed
-- Off and Steady are now a single Standard mode, whose brightness can go down to off. System mode is now the switch turned off. Saved 1.0 settings carry over.
+- Off and Steady are now a single Standard mode, whose brightness can go down to off. System mode is now the switch turned off. Saved build 1 settings carry over.
 - Music mode uses less energy during silence and while the panel is closed.
 
-## 1.0 (build 1)
+## Build 1 (tagged v1.0, not publicly released)
 
-The first version: Standard, Breathe, and Music modes for the illuminated lid logo, with Music driven by your Mac's audio output.
+The first version, numbered 1.0 before the beta numbering: Standard, Breathe, and Music modes for the illuminated lid logo, with Music driven by your Mac's audio output.

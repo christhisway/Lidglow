@@ -1,4 +1,7 @@
-LIDGLOW 1.0
+LIDGLOW 0.9.0 BETA
+
+This is a beta. Please report problems at
+https://github.com/christhisway/Lidglow/issues
 
 Lidglow pulses the illuminated Apple logo to the music playing on your Mac.
 
