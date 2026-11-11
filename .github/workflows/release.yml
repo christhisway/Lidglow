@@ -5,7 +5,9 @@
 # so the owner publishes it, which creates the tag. Betas are always marked as pre-releases, and the
 # release build carries the beta number from the tag, so Settings → About reads "0.9.0 Beta 1 (2)".
 #
-# Needs two repository secrets holding the owner's "Lidglow Self-Signed" identity:
+# Signing: with these two repository secrets, it signs with the owner's "Lidglow Self-Signed" identity,
+# so macOS keeps the audio permission across updates. Without them, it signs ad hoc, and macOS asks
+# for the permission again after each update.
 #   LIDGLOW_SIGNING_P12           the certificate and private key exported as .p12, base64-encoded
 #   LIDGLOW_SIGNING_P12_PASSWORD  the password chosen when exporting the .p12
 name: Release
@@ -28,9 +30,6 @@ concurrency:
 defaults:
   run:
     shell: bash
-
-env:
-  SIGN_IDENTITY: Lidglow Self-Signed
 
 jobs:
   release:
@@ -92,13 +91,20 @@ jobs:
           echo "PRERELEASE=$prerelease" >> "$GITHUB_ENV"
           echo "RELEASE_LABEL=$release_label" >> "$GITHUB_ENV"
 
+      # Sets SIGN_IDENTITY for the later steps: "Lidglow Self-Signed" when the secrets are set, or "-" (ad hoc).
       - name: Import the signing identity
         env:
           P12: ${{ secrets.LIDGLOW_SIGNING_P12 }}
           P12_PASSWORD: ${{ secrets.LIDGLOW_SIGNING_P12_PASSWORD }}
         run: |
+          self_signed="Lidglow Self-Signed"
+          if [[ -z "$P12" && -z "$P12_PASSWORD" ]]; then
+            echo "::warning::No signing secrets, so this release is signed ad hoc. macOS asks for the audio permission again after each update."
+            echo "SIGN_IDENTITY=-" >> "$GITHUB_ENV"
+            exit 0
+          fi
           if [[ -z "$P12" || -z "$P12_PASSWORD" ]]; then
-            echo "::error::Add the LIDGLOW_SIGNING_P12 and LIDGLOW_SIGNING_P12_PASSWORD secrets (see docs/RELEASE.md)."
+            echo "::error::Only one of LIDGLOW_SIGNING_P12 and LIDGLOW_SIGNING_P12_PASSWORD is set. Add both, or remove both to sign ad hoc."
             exit 1
           fi
           keychain="$RUNNER_TEMP/lidglow-signing.keychain-db"
@@ -113,12 +119,13 @@ jobs:
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           # A self-signed certificate isn't trusted on a fresh Mac. Trust it for code signing only, so
           # codesign accepts the identity.
-          security find-certificate -c "$SIGN_IDENTITY" -p "$keychain" > "$RUNNER_TEMP/signing.pem"
+          security find-certificate -c "$self_signed" -p "$keychain" > "$RUNNER_TEMP/signing.pem"
           if ! sudo security add-trusted-cert -d -r trustRoot -p codeSign \
               -k /Library/Keychains/System.keychain "$RUNNER_TEMP/signing.pem"; then
             echo "::warning::Couldn't mark the certificate as trusted. Signing may still work."
           fi
           security find-identity -p codesigning "$keychain"
+          echo "SIGN_IDENTITY=$self_signed" >> "$GITHUB_ENV"
 
       # Info.plist on main says "Beta". The release build says which beta, to match the tag and the
       # release title. Only this runner's checkout changes. Nothing is committed.
@@ -140,8 +147,12 @@ jobs:
           check="$RUNNER_TEMP/unpacked"
           ditto -x -k "$release/Lidglow.zip" "$check"
           codesign --verify --strict "$check/Lidglow.app" || fail "Lidglow.app's signature is invalid."
-          codesign -dvv "$check/Lidglow.app" 2>&1 | grep -qx "Authority=$SIGN_IDENTITY" \
-            || fail "Lidglow.app isn't signed by $SIGN_IDENTITY."
+          signature="$(codesign -dvv "$check/Lidglow.app" 2>&1)"
+          if [[ "$SIGN_IDENTITY" == "-" ]]; then
+            grep -qx "Signature=adhoc" <<< "$signature" || fail "Lidglow.app should be signed ad hoc, but isn't."
+          else
+            grep -qx "Authority=$SIGN_IDENTITY" <<< "$signature" || fail "Lidglow.app isn't signed by $SIGN_IDENTITY."
+          fi
           built_label="$(/usr/libexec/PlistBuddy -c 'Print :LidglowReleaseLabel' "$check/Lidglow.app/Contents/Info.plist" 2>/dev/null || true)"
           [[ "$built_label" == "$RELEASE_LABEL" ]] \
             || fail "Lidglow.app's release label is \"$built_label\", not \"$RELEASE_LABEL\"."
@@ -173,7 +184,13 @@ jobs:
             echo
             echo "SHA-256 of Lidglow.zip: \`$checksum\`"
             echo
-            echo "Built from [\`${GITHUB_SHA:0:7}\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA) by the Release workflow ([run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)) with \`LIDGLOW_SIGN_IDENTITY=\"$SIGN_IDENTITY\" Scripts/package.sh\`."
+            run_link="[run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
+            commit_link="[\`${GITHUB_SHA:0:7}\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA)"
+            if [[ "$SIGN_IDENTITY" == "-" ]]; then
+              echo "Built from $commit_link by the Release workflow ($run_link) with \`Scripts/package.sh\`. It's signed ad hoc, so macOS asks for System Audio Recording permission again after you update."
+            else
+              echo "Built from $commit_link by the Release workflow ($run_link) with \`LIDGLOW_SIGN_IDENTITY=\"$SIGN_IDENTITY\" Scripts/package.sh\`."
+            fi
           } > "$notes"
           # Always a draft: the tag ruleset only lets admins create v* tags, so publishing is the owner's step.
           flags=(--draft)
