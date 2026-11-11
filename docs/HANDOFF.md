@@ -9,6 +9,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 - Music uses a private Core Audio process tap to meter system playback, and detects transients per band. The Focus preset picks the bands. Bass (the default), Mids, and Treble each use one narrow band with 24 dB/octave Butterworth filters: 40–120 Hz, 300 Hz–3 kHz, and above 6 kHz. A hit counts only when that band carries at least 15% (fully at 50%) of the whole mix's onset energy, so leaks from other instruments don't flash the logo. Full is the original wide bass, drum, and treble detector. It uses no microphone, stores no recordings, and has no network code.
 - Idle glow sets a base between hits and tracks, capped at 90% of the chosen peak so beats can still brighten the logo. The preview and physical LED both glow white.
 - Each opening of the panel replays the laptop animation, then switches to a 2D logo that follows the live brightness. Reduce Motion goes directly to the 2D view.
+- Lidglow steps aside for any other app that controls the logo. While it holds the logo, `LidLogo` compares each level reading with the way its last command should move the logo (up, down, or held still) over windows of at least 0.3 s, and reads the backlight mode once a second. Four unexplained moves within 20 seconds, or the backlight switched off, make it restore the logo and ask the user to quit the other app. `OtherLogoApps` also recognizes some logo apps by bundle ID (currently `co.supershort.backglow`, `app.logolight.LogoLight`, and `app.lidlight.Lidlight`): while one is running, Lidglow doesn't take control, names it in the panel, and takes over when it quits.
 - Music and logo control pause on session lock, sleep, or lid closure. Normal quit restores macOS control, and so do `SIGTERM`, `SIGINT`, and `SIGHUP` (`kill`, Ctrl-C, or closing Terminal), which go through a normal quit. While Lidglow holds the logo, macOS's original backlight mode is saved in `UserDefaults` (`logoHeldOriginalMode`) and cleared by every restore. If it's still set at launch, after a crash, a force quit, or `kill -9`, `LidLogo.recoverAfterUnexpectedExit()` runs the restore sequence before anything reads the logo's state. Unsupported hardware uses the preview.
 
 ## Source map
@@ -27,7 +28,8 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `UI/SettingsWindow.swift` | The Settings window and its About section, built on open and released on close |
 | `Audio/SystemMusic.swift` | Core Audio tap lifecycle |
 | `Audio/BeatMeter.swift` | Band transient detection and the Focus (EQ) presets |
-| `Hardware/LidLogo.swift` | Logo brightness transitions, original state tracking, restoration, and recovery after an unexpected exit |
+| `Hardware/LidLogo.swift` | Logo brightness transitions, original state tracking, restoration, recovery after an unexpected exit, and detection of other apps changing the logo |
+| `Hardware/OtherLogoApps.swift` | Recognizes some other logo apps by bundle ID through launch and quit notifications |
 | `Hardware/LaptopFinish.swift` | Automatic laptop finish detection |
 | `Hardware/LogoBridge.h`, `.m` | IOKit hardware detection and dynamically loaded CoreBrightness calls |
 | `Resources/Info.plist` | Version, bundle ID, menu-bar activation, deployment target, and audio permission text |

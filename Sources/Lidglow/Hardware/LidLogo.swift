@@ -14,6 +14,15 @@ final class LidLogo {
     private let settledRecheck = 0.5
     var isSettled: Bool { settledTarget != nil }
     private(set) var measuredLevel = 0.0
+    // Any app can drive the logo through the same private controls, so Lidglow doesn't rely on knowing
+    // them. While it holds the logo it knows which way the logo should be moving: up during a ramp
+    // toward light, down toward dark, or nowhere while holding. Repeated movement the other way, or the
+    // backlight being switched off, means something else is controlling it. This reuses the level reads
+    // the glow loop already makes, plus one backlight-mode read a second.
+    private var interference: [Double] = []
+    private(set) var interferenceDetected = false
+    private var reference: (level: Double, time: Double, command: Double)?
+    private var nextModeCheck = 0.0
     var onRiseFromDark: (() -> Void)?
 
     /// While Lidglow holds the logo, macOS's original backlight mode is saved here. A normal restore
@@ -64,6 +73,10 @@ final class LidLogo {
             return false
         }
         originalMode = mode
+        interference = []
+        interferenceDetected = false
+        reference = nil
+        nextModeCheck = 0
         direction = nil
         holding = false
         lastChange = -.infinity
@@ -75,6 +88,7 @@ final class LidLogo {
         guard let mode = originalMode else { return }
         originalMode = nil
         settledTarget = nil
+        reference = nil
         if direction != nil {
             let displayAwake = awake && !bridge.lidClosed
             if displayAwake {
@@ -97,10 +111,16 @@ final class LidLogo {
                 maxDuration: Double = 3) -> Bool {
         guard originalMode != nil else { return false }
         if target == settledTarget && now < nextSettledCheck { return true }
+        let wasSettled = target == settledTarget
         settledTarget = nil
         let level = bridge.level
         guard level.isFinite else { return false }
         measuredLevel = min(1, max(0, level))
+        if wasSettled && abs(level - target) > max(0.06, tolerance * 2) {
+            noteInterference(now)
+        } else {
+            checkForInterference(level: level, now: now)
+        }
         let delta = target - level
         if abs(delta) <= tolerance || (target == 0 && direction == false && !holding) {
             let needsHold = !holding && target > 0 && target < 1 && direction != nil
@@ -134,6 +154,30 @@ final class LidLogo {
         let duration = min(maxDuration, (rising ? rise : fall) / max(0.05, high))
         if rising && level < 0.04 { onRiseFromDark?() }
         return command(rising, duration: duration, hold: false, now: now)
+    }
+
+    /// Compares the level with where Lidglow's last command should have taken it. Each comparison spans
+    /// at least 0.3 s of one unchanged command, so slow fades from another app add up to a clear move.
+    private func checkForInterference(level: Double, now: Double) {
+        if now >= nextModeCheck {
+            nextModeCheck = now + 1
+            // Lidglow keeps the backlight on while it holds the logo. Off means someone else turned it off.
+            if bridge.mode == 0 { noteInterference(now) }
+        }
+        guard let direction else { reference = nil; return }
+        if let reference, reference.command == lastChange {
+            guard now - reference.time >= 0.3 else { return }
+            let moved = level - reference.level
+            let unexpected = holding ? abs(moved) > 0.06 : (direction ? moved < -0.06 : moved > 0.06)
+            if unexpected { noteInterference(now) }
+        }
+        reference = (level, now, lastChange)
+    }
+
+    /// Four unexplained moves within 20 seconds count as another app controlling the logo.
+    private func noteInterference(_ now: Double) {
+        interference = interference.filter { now - $0 < 20 } + [now]
+        if interference.count >= 4 { interferenceDetected = true }
     }
 
     private func command(_ lit: Bool, duration: Double, hold: Bool, now: Double) -> Bool {

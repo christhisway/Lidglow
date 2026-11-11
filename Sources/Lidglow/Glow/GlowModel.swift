@@ -60,6 +60,7 @@ final class GlowModel: ObservableObject {
 
     private let logo = LidLogo()
     private let music = SystemMusic()
+    private let otherApps = OtherLogoApps()
     private var timer: Timer?
     private var phaseStart = 0.0
     private var sessionActive = true
@@ -97,6 +98,7 @@ final class GlowModel: ObservableObject {
         distributed.addObserver(self, selector: #selector(unlockSession), name: .init("com.apple.screenIsUnlocked"), object: nil)
         music.onSound = { [weak self] in self?.speedUp() }
         music.preset = eqPreset
+        otherApps.onChange = { [weak self] in self?.otherAppsChanged() }
     }
 
     var hasHardware: Bool { logo.bridge.hardwarePresent }
@@ -150,6 +152,14 @@ final class GlowModel: ObservableObject {
             level = 0
             latestLevel = 0
             status = idleStatus
+            return
+        }
+        // Another logo utility is running. Leave the logo alone until it quits, which `otherAppsChanged`
+        // hears about, so no timer is needed in the meantime.
+        if hasHardware, let other = otherApps.running {
+            level = 0
+            latestLevel = 0
+            status = "\(other) is controlling the lid logo. Quit it to use Lidglow."
             return
         }
         if timer == nil { schedule(Self.fastTick) }
@@ -208,6 +218,14 @@ final class GlowModel: ObservableObject {
     /// Something changed that the glow should react to right away instead of on the next idle tick.
     private func speedUp() {
         if let timer, timer.timeInterval > Self.fastTick + 1e-6 { schedule(Self.fastTick) }
+    }
+
+    private func otherAppsChanged() {
+        guard enabled, hasHardware else { return }
+        // `stop()` hands the logo back to macOS through the normal restore path before anything else
+        // touches it.
+        stop()
+        start()
     }
 
     func stop() {
@@ -282,6 +300,12 @@ final class GlowModel: ObservableObject {
                 stop()
                 publishLevel(0)
                 publishStatus("Couldn’t control the lid logo. Select a mode to retry.")
+                return
+            }
+            if logo.interferenceDetected {
+                stop()
+                publishLevel(0)
+                publishStatus("Another app is changing the lid logo. Quit it, then select a mode to retry.")
                 return
             }
         }
