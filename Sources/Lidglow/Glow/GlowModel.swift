@@ -1,5 +1,7 @@
 import AppKit
+import AVFoundation
 import Combine
+import os
 
 final class GlowModel: ObservableObject {
     @Published private(set) var mode: GlowMode = .standard
@@ -19,6 +21,81 @@ final class GlowModel: ObservableObject {
     }
     @Published var sensitivity = UserDefaults.standard.object(forKey: "sensitivity") as? Double ?? 1.0 {
         didSet { UserDefaults.standard.set(sensitivity, forKey: "sensitivity") }
+    }
+
+    @Published var eqPreset = UserDefaults.standard.string(forKey: "eqPreset")
+        .flatMap(EQPreset.init(saved:)) ?? .bass {
+        didSet {
+            UserDefaults.standard.set(eqPreset.rawValue, forKey: "eqPreset")
+            music.preset = eqPreset
+        }
+    }
+
+    @Published var breatheSpeed = UserDefaults.standard.string(forKey: "breatheSpeed")
+        .flatMap(BreatheSpeed.init(rawValue:)) ?? .normal {
+        didSet {
+            UserDefaults.standard.set(breatheSpeed.rawValue, forKey: "breatheSpeed")
+            // Keep the current point in the breath and continue from it at the new speed, so the glow
+            // doesn't jump.
+            let now = ProcessInfo.processInfo.systemUptime
+            phaseStart = now - (now - phaseStart) / oldValue.period * breatheSpeed.period
+        }
+    }
+
+    /// Where Music mode gets its sound. Chosen apps by default. The microphone is only ever opened when
+    /// the user picks it here and macOS has granted access. Set it through `selectMusicSource(_:)`.
+    @Published private(set) var musicSource = UserDefaults.standard.string(forKey: "musicSource")
+        .flatMap(MusicSource.init(rawValue:)) ?? .chosenApps {
+        didSet {
+            UserDefaults.standard.set(musicSource.rawValue, forKey: "musicSource")
+            applyMusicSource()
+        }
+    }
+    /// The user picked Microphone, but macOS doesn't allow Lidglow to use it.
+    @Published private(set) var microphoneDenied = false
+    static let defaultMusicApps = ["com.spotify.client", "com.apple.Music"]
+    /// Bundle IDs of the apps Music listens to when the source is `.chosenApps`.
+    @Published var musicApps = UserDefaults.standard.stringArray(forKey: "musicApps") ?? GlowModel.defaultMusicApps {
+        didSet {
+            UserDefaults.standard.set(musicApps, forKey: "musicApps")
+            applyMusicSource()
+        }
+    }
+
+    private var musicInput: SystemMusic.Source {
+        switch musicSource {
+        case .chosenApps: return .apps(Set(musicApps))
+        case .allApps: return .allApps
+        case .microphone: return .microphone
+        }
+    }
+
+    private func applyMusicSource() {
+        music.source = musicInput
+        // Clear an error from the previous source, such as revoked microphone access, so the next tick
+        // starts the new one.
+        if audioError && mode == .music { audioError = false; music.stop() }
+        speedUp()
+    }
+
+    /// Switches Music's source. Choosing the microphone asks macOS for access the first time, and only
+    /// switches once it's granted.
+    func selectMusicSource(_ source: MusicSource) {
+        microphoneDenied = false
+        guard source == .microphone else { musicSource = source; return }
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            musicSource = .microphone
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    if granted { self.musicSource = .microphone } else { self.microphoneDenied = true }
+                }
+            }
+        default:
+            microphoneDenied = true
+        }
     }
 
     @Published var idleGlow = UserDefaults.standard.bool(forKey: "idleGlow") {
@@ -41,6 +118,7 @@ final class GlowModel: ObservableObject {
 
     private let logo = LidLogo()
     private let music = SystemMusic()
+    private let otherApps = OtherLogoApps()
     private var timer: Timer?
     private var phaseStart = 0.0
     private var sessionActive = true
@@ -60,7 +138,9 @@ final class GlowModel: ObservableObject {
     }
 
     init() {
+        logo.recoverAfterUnexpectedExit()
         status = idleStatus
+        Logger.hardware.notice("Hardware check: \(self.idleStatus, privacy: .public)")
         let events: [(NSNotification.Name, Selector)] = [
             (NSWorkspace.screensDidSleepNotification, #selector(screenSleep)),
             (NSWorkspace.screensDidWakeNotification, #selector(screenWake)),
@@ -76,6 +156,16 @@ final class GlowModel: ObservableObject {
         distributed.addObserver(self, selector: #selector(lockSession), name: .init("com.apple.screenIsLocked"), object: nil)
         distributed.addObserver(self, selector: #selector(unlockSession), name: .init("com.apple.screenIsUnlocked"), object: nil)
         music.onSound = { [weak self] in self?.speedUp() }
+        music.source = musicInput
+        music.onFailure = { [weak self] error in
+            guard let self, self.mode == .music else { return }
+            self.pause()
+            self.audioError = true
+            self.publishStatus(error.localizedDescription)
+            self.publishLevel(0)
+        }
+        music.preset = eqPreset
+        otherApps.onChange = { [weak self] in self?.otherAppsChanged() }
     }
 
     /// The logo can be controlled: the hardware is there and the private CoreBrightness interface looks
@@ -134,6 +224,14 @@ final class GlowModel: ObservableObject {
             status = idleStatus
             return
         }
+        // Another logo utility is running. Leave the logo alone until it quits, which `otherAppsChanged`
+        // hears about, so no timer is needed in the meantime.
+        if hasHardware, let other = otherApps.running {
+            level = 0
+            latestLevel = 0
+            status = "\(other) is controlling the lid logo. Quit it to use Lidglow."
+            return
+        }
         if timer == nil { schedule(Self.fastTick) }
         tick()
     }
@@ -148,8 +246,8 @@ final class GlowModel: ObservableObject {
         onIconChange?(lit)
     }
 
-    // Music samples audio every tick, so it keeps the full rate while sound is playing. A 5 s breath
-    // doesn't need 60 Hz, and a settled, paused, or silent glow only needs to notice drift, lid
+    // Music samples audio every tick, so it keeps the full rate while sound is playing. Even a 3 s
+    // breath doesn't need 60 Hz, and a settled, paused, or silent glow only needs to notice drift, lid
     // closure, or a new target. During silence the audio callback wakes the loop on the first beat.
     private static let fastTick = 1 / 60.0
     private static let breatheTick = 1 / 30.0
@@ -192,6 +290,14 @@ final class GlowModel: ObservableObject {
         if let timer, timer.timeInterval > Self.fastTick + 1e-6 { schedule(Self.fastTick) }
     }
 
+    private func otherAppsChanged() {
+        guard enabled, hasHardware else { return }
+        // `stop()` hands the logo back to macOS through the normal restore path before anything else
+        // touches it.
+        stop()
+        start()
+    }
+
     func stop() {
         timer?.invalidate()
         timer = nil
@@ -223,7 +329,7 @@ final class GlowModel: ObservableObject {
             publishStatus("Paused while the lid or screen is inactive")
             return
         }
-        if mode == .music && !music.running && !audioError {
+        if mode == .music && !music.started && !audioError {
             do { try music.start() }
             catch {
                 pause()
@@ -238,7 +344,7 @@ final class GlowModel: ObservableObject {
         switch mode {
         case .standard: target = brightness; label = brightness > 0 ? "Standard glow" : "Lid logo off"
         case .breathe:
-            target = brightness * (0.15 + 0.85 * (1 - cos((now - phaseStart) * 2 * .pi / 5)) / 2)
+            target = brightness * (0.15 + 0.85 * (1 - cos((now - phaseStart) * 2 * .pi / breatheSpeed.period)) / 2)
             label = "Breathing"
         case .music:
             let signal = music.level(at: now)
@@ -246,23 +352,61 @@ final class GlowModel: ObservableObject {
             let pulse = min(1, max(0, (signal - SystemMusic.soundThreshold) * sensitivity))
             let base = idleGlow ? min(idleBrightness, brightness * 0.90) : 0
             target = base + (brightness - base) * pulse
-            label = lastSignal.map { now - $0 < Self.silenceDelay } == true
-                ? "Reacting to system audio" : "Waiting for music · Play something on your Mac"
+            if lastSignal.map({ now - $0 < Self.silenceDelay }) == true {
+                switch musicSource {
+                case .chosenApps: label = "Reacting to your music apps"
+                case .allApps: label = "Reacting to system audio"
+                case .microphone: label = "Reacting to the microphone"
+                }
+            } else if music.waitingForApps {
+                label = musicApps.isEmpty ? "No music apps chosen · Choose them in Settings"
+                                          : "Waiting for music · Open a music app chosen in Settings"
+            } else if musicSource == .microphone {
+                label = "Waiting for sound · Listening to the microphone"
+            } else {
+                label = "Waiting for music · Play something on your Mac"
+            }
         }
         if hasHardware {
-            guard logo.takeControl(),
-                  logo.follow(target, now: now, rise: mode == .music ? 0.065 : 0.17,
-                              fall: mode == .music ? 0.15 : 0.22,
-                              tolerance: mode == .music && idleGlow && target == idleBrightness
-                                ? min(0.012, target / 2) : 0.045) else {
+            let following: Bool
+            if mode == .breathe {
+                following = logo.takeControl() && followBreath(now: now)
+            } else {
+                following = logo.takeControl()
+                    && logo.follow(target, now: now, rise: mode == .music ? 0.065 : 0.17,
+                                   fall: mode == .music ? 0.15 : 0.22,
+                                   tolerance: mode == .music && idleGlow && target == idleBrightness
+                                       ? min(0.012, target / 2) : 0.045)
+            }
+            guard following else {
                 stop()
                 publishLevel(0)
                 publishStatus("Couldn’t control the lid logo. Select a mode to retry.")
                 return
             }
+            if logo.interferenceDetected {
+                stop()
+                publishLevel(0)
+                publishStatus("Another app is changing the lid logo. Quit it, then select a mode to retry.")
+                return
+            }
         }
         publishLevel(mode == .music && hasHardware ? logo.measuredLevel : target)
         publishStatus(hasHardware ? label : "Preview · " + label)
+    }
+
+    /// Chasing the moving breath target made the logo fade a little, hold, and fade again, because
+    /// each time it caught up it stopped until the target moved past the tolerance. That stepping was
+    /// worst at Slow. Instead, aim each ramp at the breath's next peak or trough and time it to arrive
+    /// there, so the hardware's own smooth fade carries a whole half-breath.
+    private func followBreath(now: Double) -> Bool {
+        let period = breatheSpeed.period
+        let phase = ((now - phaseStart) / period).truncatingRemainder(dividingBy: 1)
+        let rising = phase < 0.5
+        let extreme = rising ? brightness : brightness * 0.15
+        let remaining = max(0.05, ((rising ? 0.5 : 1) - phase) * period)
+        return logo.follow(extreme, now: now, rise: remaining, fall: remaining, tolerance: 0.03,
+                           maxDuration: period)
     }
 
     private func publishLevel(_ value: Double) {
@@ -276,8 +420,10 @@ final class GlowModel: ObservableObject {
         if status != value { status = value }
     }
 
+    /// Opens the privacy pane for the current source: Microphone, or Screen & System Audio Recording.
     func openAudioSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture") {
+        let pane = musicSource == .microphone ? "Privacy_Microphone" : "Privacy_AudioCapture"
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") {
             NSWorkspace.shared.open(url)
         }
     }

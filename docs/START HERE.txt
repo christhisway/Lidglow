@@ -3,6 +3,11 @@ LIDGLOW 1.0
 Lidglow pulses the illuminated Apple logo to the music playing on your Mac.
 
 Install
+The easiest way is to run this in Terminal, which also works for updates:
+
+  curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash
+
+Or install from this archive:
 1. Unzip the archive. Drag Lidglow.app into Applications.
 2. Open Lidglow from Applications and click its waveform icon in the menu bar.
    Turn on the switch in the top-right corner of the panel.
@@ -11,15 +16,39 @@ Install
    reacts. Turn on Idle glow to keep a base level and use Idle brightness to
    adjust it. Turn the switch off to return control to macOS.
 
-Quit other lid-light utilities before using Lidglow. This prebuilt app requires
+Quit other lid-light apps before using Lidglow. If another app changes the logo
+while Lidglow is using it, Lidglow steps aside and tells you in its panel. This prebuilt app requires
 Apple silicon and macOS 14.2 or later. Physical logo control requires a MacBook
 Pro with a PROLED XDR display and a controllable illuminated lid logo. Other
 Apple silicon Macs can use the on-screen preview.
 
+To open Lidglow when you log in, turn on Settings > General > Open at Login.
+
+If the logo gets stuck
+If the lid logo stays dim, dark, or at one level after Lidglow crashed or was
+force quit, open Lidglow again. It repairs the logo when it starts. If the logo
+still looks wrong, quit Lidglow normally and restart your Mac.
+
+Uninstall
+Quit Lidglow first (Quit in its panel), so it hands the logo back to macOS.
+Then either run this in Terminal:
+
+  curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/uninstall.sh | bash
+
+or delete Lidglow.app from Applications. Optional cleanup:
+- Settings: run  defaults delete io.github.christhisway.lidglow
+- Audio permission: System Settings > Privacy & Security > Screen & System
+  Audio Recording
+- Microphone permission (if you used it): System Settings > Privacy &
+  Security > Microphone
+- Login item: System Settings > General > Login Items
+If the logo still looks wrong afterwards, restart your Mac.
+
 If macOS blocks the first launch
-This is an ad-hoc signed build without Apple notarization. If you trust the
-sender and macOS offers Open Anyway, find it in System Settings > Privacy &
-Security after trying to open the app. Apple explains the steps here:
+Lidglow isn't notarized by Apple. The Terminal installer avoids this warning.
+If you installed from a browser download, try to open the app once, then go to
+System Settings > Privacy & Security and click Open Anyway. (Since macOS 15,
+Control-click > Open no longer works for this.) Apple explains the steps here:
 https://support.apple.com/en-us/102445
 
 If you prefer to build locally, open README.md in the source folder. Give
