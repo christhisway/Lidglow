@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import os
 
 final class LidLogo {
     let bridge = LogoBridge()
@@ -64,14 +65,19 @@ final class LidLogo {
     func takeControl() -> Bool {
         guard originalMode == nil else { return true }
         let mode = bridge.mode
-        guard mode >= 0, bridge.level.isFinite else { return false }
+        guard mode >= 0, bridge.level.isFinite else {
+            Logger.hardware.error("Couldn't read the logo state, so Lidglow didn't take control")
+            return false
+        }
         // Mark the logo as held before changing anything, so a crash from here on is repaired at the
         // next launch.
         UserDefaults.standard.set(mode, forKey: Self.heldModeKey)
         if mode == 0 && !bridge.enableLogo(true) {
             UserDefaults.standard.removeObject(forKey: Self.heldModeKey)
+            Logger.hardware.error("Couldn't enable the logo backlight")
             return false
         }
+        Logger.hardware.notice("Took control of the logo (backlight mode \(mode))")
         originalMode = mode
         interference = []
         interferenceDetected = false
@@ -100,6 +106,7 @@ final class LidLogo {
             }
         }
         if mode == 0 { _ = bridge.enableLogo(false) }
+        Logger.hardware.notice("Handed the logo back to macOS (backlight mode \(mode))")
         direction = nil
         holding = false
         UserDefaults.standard.removeObject(forKey: Self.heldModeKey)

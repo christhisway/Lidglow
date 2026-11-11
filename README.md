@@ -21,11 +21,28 @@ Lidglow never checks for updates itself, because it has no network code. New ver
 
 To update, quit Lidglow from the panel or its Control-click menu so it hands the logo back to macOS, then replace `Lidglow.app` with the new version and open it. Because this build is ad-hoc signed, macOS may ask for System Audio Recording permission again after an update.
 
+## Privacy
+
+Lidglow uses no microphone, records nothing, and has no network code. Music mode reduces your Mac's audio output to a brightness level as it plays and then discards it. Settings are stored only in macOS preferences. Read the full [privacy statement](PRIVACY.md).
+
+## Reporting bugs
+
+Lidglow has no network code, so it never sends crash reports or diagnostics anywhere. To report a problem, [open an issue](https://github.com/christhisway/Lidglow/issues/new/choose) and include what you can of the following:
+
+- **Crash reports:** open the Console app and choose **Crash Reports**, or look in `~/Library/Logs/DiagnosticReports/` for files whose names start with `Lidglow`.
+- **Recent logs:** run this in Terminal shortly after the problem happens:
+
+  ```sh
+  log show --last 10m --info --predicate 'subsystem == "io.github.christhisway.lidglow"'
+  ```
+
+  Lidglow logs when it takes and releases control of the logo, the result of its hardware check, and when the system audio tap starts, stops, or fails. The logs contain no audio and stay on your Mac until you share them.
+
 ## Project layout
 
 ```
 Sources/Lidglow/
-  App/        Entry point and application delegate (status item, panel window)
+  App/        Entry point, application delegate (status item, panel window), and local log categories
   Glow/       Glow modes and the model that drives the logo each tick
   UI/         SwiftUI controls, shared Liquid Glass styling, the borderless menu panel, the Settings window, and the animated laptop preview
   Audio/      Core Audio process tap and the BeatMeter detector
