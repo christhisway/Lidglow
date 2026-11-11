@@ -11,6 +11,8 @@ Lidglow is a native macOS menu-bar app for the illuminated Apple logo on MacBook
 
 If Music remains on “Waiting for music” during playback, use **System Audio Settings…** to check Lidglow’s access under **Privacy & Security → Screen & System Audio Recording**. After changing access, reselect **Music** or quit and reopen Lidglow.
 
+If the lid logo is stuck dim, dark, or at one level (for example after Lidglow crashed or was force quit), open Lidglow again. It notices that it didn't hand the logo back and repairs it at launch, even with the switch off. If the logo still looks wrong, quit Lidglow normally and restart your Mac.
+
 Audio processing runs locally through a private Core Audio tap. The app reduces playback to a level driven by hits in the chosen Focus and discards the samples. Hardware modes pause when the session locks, the display sleeps, or the lid closes. Older Macs can use the in-panel preview.
 
 ## Updating
