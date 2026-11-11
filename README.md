@@ -2,10 +2,32 @@
 
 Lidglow is a native macOS menu-bar app for the illuminated Apple logo on MacBook Pro with PROLED XDR Display. The included app is an ad-hoc signed Apple silicon build.
 
+## Install
+
+Lidglow needs a Mac with Apple silicon and macOS 14.2 or later. Run this in Terminal:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash
+```
+
+The script checks your Mac, downloads the latest release from GitHub Releases, verifies its SHA-256 checksum, quits any running Lidglow normally so the logo goes back to macOS, installs `Lidglow.app` in `/Applications` (or `~/Applications` if `/Applications` isn't writable), and opens it. Run the same command again to update. It doesn't use `sudo`.
+
+To read the script before running it:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh -o install-lidglow.sh
+less install-lidglow.sh
+bash install-lidglow.sh
+```
+
+To start Lidglow automatically, turn on **Settings → General → Open at Login**.
+
+**Lidglow isn't notarized by Apple.** It's a free personal project, so it doesn't pay for an Apple Developer ID. Installing with the command above opens the app normally, because files downloaded with `curl` aren't marked as quarantined. If you download `Lidglow.zip` in a browser instead, macOS blocks the first launch: open the app once, then go to **System Settings → Privacy & Security** and click **Open Anyway**. (Since macOS 15, Control-click → Open no longer bypasses this.) Either way, you're trusting this project directly. Each release lists its checksum and the source it was built from.
+
 ## Use Lidglow
 
 1. Quit Backglow or any other utility controlling the lid logo so that only one app sends brightness commands.
-2. Open **Lidglow.app** in Finder. Click the waveform circle in the macOS menu bar to open its controls, and turn on the switch in the panel's top-right corner. Click the gear next to the switch (or press ⌘, while the panel is open) for **Settings**, which shows the version and project links. Control-click or right-click the icon for **Open Settings…** and **Quit Lidglow**.
+2. Open **Lidglow.app** (the installer opens it for you). Click the waveform circle in the macOS menu bar to open its controls, and turn on the switch in the panel's top-right corner. Click the gear next to the switch (or press ⌘, while the panel is open) for **Settings**, which shows the version and project links. Control-click or right-click the icon for **Open Settings…** and **Quit Lidglow**.
 3. Choose **Music**, allow macOS system audio capture when prompted, and play music. **Brightness** sets the peak glow and **Sensitivity** adjusts how strongly bass and drum hits drive it. Turn on **Idle glow** to keep a base between beats and tracks. Use **Idle brightness** to raise or lower it.
 4. Turn the switch off to hand brightness back to macOS. **Standard** holds the logo at the chosen brightness (drag **Brightness** all the way down to turn it off), and **Breathe** fades it slowly.
 
@@ -24,8 +46,8 @@ Sources/Lidglow/
   Hardware/   Lid logo control, laptop finish detection, and the Objective-C CoreBrightness bridge
   Resources/  Info.plist
 Tests/BeatMeterTests/  Synthetic beat detector check
-Scripts/      build.sh and test.sh
-docs/         Handoff notes and the end-user install guide
+Scripts/      build.sh, test.sh, package.sh (release zip and checksum), and install.sh (the Terminal installer)
+docs/         Handoff notes, the end-user install guide, and the release checklist
 ```
 
 ## Build
@@ -38,6 +60,13 @@ To run the synthetic beat detector check:
 Scripts/test.sh
 ```
 
-The default signature is ad hoc. For a notarization candidate, set `LIDGLOW_SIGN_IDENTITY` to a Developer ID Application identity installed in your keychain. This enables the hardened runtime and secure timestamp. Submit and staple the resulting app before distributing it as a notarized release. [Apple’s notarization instructions](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
+`Scripts/package.sh` builds the release files that the installer downloads: `build/release/Lidglow.zip` and `Lidglow.zip.sha256`. See [docs/RELEASE.md](docs/RELEASE.md) for the release checklist.
+
+The default signature is ad hoc, which changes with every build, so macOS asks for System Audio Recording permission again after each update. To avoid that for free, sign releases with a self-signed certificate:
+
+1. Once, in **Keychain Access**, choose **Keychain Access → Certificate Assistant → Create a Certificate…**. Name it `Lidglow Self-Signed`, set **Identity Type** to **Self-Signed Root** and **Certificate Type** to **Code Signing**, and create it. Back it up (export it as a `.p12` with a password) and never commit it.
+2. Build with `LIDGLOW_SIGN_IDENTITY="Lidglow Self-Signed" Scripts/package.sh`.
+
+Every release signed this way has the same designated requirement, so macOS keeps the audio permission. For a notarized release instead, set `LIDGLOW_SIGN_IDENTITY` to a `Developer ID Application` identity. Only that kind of identity enables the hardened runtime and secure timestamp. Then submit and staple the app before distributing it. [Apple’s notarization instructions](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
 
 Lidglow uses the documented Core Audio tap interface and a dynamically loaded, private CoreBrightness interface. Hardware compatibility depends on macOS. [Apple’s Core Audio documentation](https://developer.apple.com/documentation/coreaudio/capturing-system-audio-with-core-audio-taps) · [LogoLight’s CoreBrightness research](https://github.com/Ark0N/LogoLight/blob/main/docs/corebrightnessd.md)

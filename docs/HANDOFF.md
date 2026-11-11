@@ -24,7 +24,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `UI/LaptopPreview.swift` | SceneKit intro and live logo close-up |
 | `UI/LaptopChassis.swift` | Laptop geometry and materials |
 | `UI/MenuPanel.swift` | Borderless key-capable panel |
-| `UI/SettingsWindow.swift` | The Settings window and its About section, built on open and released on close |
+| `UI/SettingsWindow.swift` | The Settings window with its General (Open at Login) and About sections, built on open and released on close |
 | `Audio/SystemMusic.swift` | Core Audio tap lifecycle |
 | `Audio/BeatMeter.swift` | Bass and drum transient detection |
 | `Hardware/LidLogo.swift` | Logo brightness transitions, original state tracking, and restoration |
@@ -32,7 +32,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `Hardware/LogoBridge.h`, `.m` | IOKit hardware detection and dynamically loaded CoreBrightness calls |
 | `Resources/Info.plist` | Version, bundle ID, menu-bar activation, deployment target, and audio permission text |
 
-Paths are relative to `Sources/Lidglow/`. Outside it, `Scripts/build.sh` builds and signs the app, `Scripts/test.sh` runs `Tests/BeatMeterTests/BeatMeterCheck.swift` (synthetic checks for kick and snare response, steady audio, and silence).
+Paths are relative to `Sources/Lidglow/`. Outside it, `Scripts/build.sh` builds and signs the app, `Scripts/package.sh` makes the release zip and its SHA-256, `Scripts/install.sh` is the Terminal installer and updater, `docs/RELEASE.md` is the release checklist, `Scripts/test.sh` runs `Tests/BeatMeterTests/BeatMeterCheck.swift` (synthetic checks for kick and snare response, steady audio, and silence).
 
 ## Build and verify
 
@@ -46,4 +46,4 @@ For changes, quit other logo utilities and older Lidglow copies before testing. 
 
 Logo control uses a private CoreBrightness interface and may need adjustment after macOS updates. Keep hardware detection and restoration intact when changing that path. Core Audio capture uses the public process tap API and needs per-app system audio permission.
 
-The bundled release is arm64, ad-hoc signed, and unnotarized. For a release that can pass Gatekeeper’s standard distribution checks, use a Developer ID Application signature and Apple notarization. After notarization, staple the ticket to the app and then recreate the ZIP. [Apple’s notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
+Releases are arm64 and unnotarized on purpose (no paid Developer ID). They're installed with `Scripts/install.sh`, which downloads with `curl` so no quarantine attribute is set, and verifies the published SHA-256. Sign releases with the owner's self-signed `Lidglow Self-Signed` identity (`LIDGLOW_SIGN_IDENTITY`) so the audio permission survives updates. Open at Login uses `SMAppService.mainApp`. The steps below only apply if a Developer ID is ever used. For a release that can pass Gatekeeper’s standard distribution checks, use a Developer ID Application signature and Apple notarization. After notarization, staple the ticket to the app and then recreate the ZIP. [Apple’s notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
