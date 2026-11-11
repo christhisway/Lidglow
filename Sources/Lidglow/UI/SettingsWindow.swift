@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 import SwiftUI
 
 /// The Settings window, opened from the gear in the panel, ⌘, while the panel is focused, or the
@@ -40,6 +41,7 @@ private struct SettingsView: View {
 
     var body: some View {
         Form {
+            GeneralSection()
             MusicSection(model: model)
             AboutSection()
         }
@@ -200,6 +202,44 @@ private struct MusicApp: Identifiable {
             }
             return MusicApp(id: id, name: id, icon: fallback)
         }
+    }
+}
+
+/// Open at Login, through the system's login item service for the app itself (macOS 13 and later).
+private struct GeneralSection: View {
+    @State private var status = SMAppService.mainApp.status
+    @State private var failure: String?
+
+    var body: some View {
+        Section("General") {
+            Toggle("Open at Login", isOn: Binding(get: { status == .enabled || status == .requiresApproval },
+                                                  set: setOpenAtLogin))
+            if status == .requiresApproval {
+                LabeledContent {
+                    Button("Open Login Items…") { SMAppService.openSystemSettingsLoginItems() }
+                } label: {
+                    Text("Needs your approval")
+                    Text("Allow Lidglow in System Settings → General → Login Items.")
+                }
+            }
+            if let failure {
+                Text(failure).font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        // Approval happens in System Settings, so check again when the user comes back.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            status = SMAppService.mainApp.status
+        }
+    }
+
+    private func setOpenAtLogin(_ on: Bool) {
+        do {
+            if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+            failure = nil
+        } catch {
+            failure = "Couldn’t change Open at Login: \(error.localizedDescription)"
+        }
+        status = SMAppService.mainApp.status
     }
 }
 

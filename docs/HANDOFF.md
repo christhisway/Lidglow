@@ -26,7 +26,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `UI/LaptopPreview.swift` | SceneKit intro and live logo close-up |
 | `UI/LaptopChassis.swift` | Laptop geometry and materials |
 | `UI/MenuPanel.swift` | Borderless key-capable panel and its glass backdrop, clipped to its rounded shape so the window shadow follows the corners |
-| `UI/SettingsWindow.swift` | The Settings window, its Music source picker and app sheet, and its About section, built on open and released on close |
+| `UI/SettingsWindow.swift` | The Settings window with its General (Open at Login), Music (source picker and app sheet), and About sections, built on open and released on close |
 | `Audio/SystemMusic.swift` | Music sources: Core Audio tap lifecycle, per-app process matching, the process list listener, and microphone input |
 | `Audio/BeatMeter.swift` | Band transient detection and the Focus (EQ) presets |
 | `Hardware/LidLogo.swift` | Logo brightness transitions, original state tracking, restoration, recovery after an unexpected exit, and detection of other apps changing the logo |
@@ -34,9 +34,9 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `Hardware/LaptopFinish.swift` | Automatic laptop finish detection |
 | `Hardware/LogoBridge.h`, `.m` | IOKit hardware detection and dynamically loaded CoreBrightness calls |
 | `Resources/Info.plist` | Version, bundle ID, menu-bar activation, deployment target, and audio and microphone permission text |
-| `Resources/Lidglow.entitlements` | Microphone (audio input) entitlement, applied when `build.sh` signs with the hardened runtime |
+| `Resources/Lidglow.entitlements` | Microphone (audio input) entitlement, applied when `build.sh` signs with a Developer ID identity and the hardened runtime |
 
-Paths are relative to `Sources/Lidglow/`. Outside it, `Scripts/build.sh` builds and signs the app, `Scripts/test.sh` runs `Tests/BeatMeterTests/BeatMeterCheck.swift` (synthetic checks for kick, snare, hi-hat, and guitar-note response, steady audio, and silence, for every Focus preset).
+Paths are relative to `Sources/Lidglow/`. Outside it, `Scripts/build.sh` builds and signs the app, `Scripts/package.sh` makes the release zip and its SHA-256, `Scripts/install.sh` is the Terminal installer and updater, `docs/RELEASE.md` is the release checklist, and `Scripts/test.sh` runs `Tests/BeatMeterTests/BeatMeterCheck.swift` (synthetic checks for kick, snare, hi-hat, and guitar-note response, steady audio, and silence, for every Focus preset).
 
 ## Build and verify
 
@@ -50,4 +50,4 @@ For changes, quit other logo utilities and older Lidglow copies before testing. 
 
 Logo control uses a private CoreBrightness interface and may need adjustment after macOS updates. Keep hardware detection and restoration intact when changing that path. Core Audio capture uses the public process tap API and needs per-app system audio permission.
 
-The bundled release is arm64, ad-hoc signed, and unnotarized. For a release that can pass Gatekeeper’s standard distribution checks, use a Developer ID Application signature and Apple notarization. After notarization, staple the ticket to the app and then recreate the ZIP. [Apple’s notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
+Releases are arm64 and unnotarized on purpose (no paid Developer ID). They're installed with `Scripts/install.sh`, which downloads with `curl` so no quarantine attribute is set, and verifies the published SHA-256. Sign releases with the owner's self-signed `Lidglow Self-Signed` identity (`LIDGLOW_SIGN_IDENTITY`) so the audio permission survives updates. Open at Login uses `SMAppService.mainApp`. The steps below only apply if a Developer ID is ever used. For a release that can pass Gatekeeper’s standard distribution checks, use a Developer ID Application signature and Apple notarization. After notarization, staple the ticket to the app and then recreate the ZIP. [Apple’s notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
