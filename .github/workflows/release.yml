@@ -1,0 +1,182 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Builds Lidglow from main and creates a GitHub Release with Lidglow.zip and Lidglow.zip.sha256.
+# It only runs when started by hand: Actions → Release → Run workflow. See docs/RELEASE.md.
+#
+# Needs two repository secrets holding the owner's "Lidglow Self-Signed" identity:
+#   LIDGLOW_SIGNING_P12           the certificate and private key exported as .p12, base64-encoded
+#   LIDGLOW_SIGNING_P12_PASSWORD  the password chosen when exporting the .p12
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create, for example v0.9.0-beta.1 (must match the version in Info.plist)"
+        required: true
+        type: string
+      publish:
+        description: "Publish right away (otherwise it's a draft you check and publish yourself)"
+        type: boolean
+        default: false
+      prerelease:
+        description: "Mark as a GitHub pre-release (the installer's latest link skips pre-releases)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  SIGN_IDENTITY: Lidglow Self-Signed
+
+jobs:
+  release:
+    # Releases are only ever built from main, even if another branch is picked when starting the run.
+    if: github.ref == 'refs/heads/main'
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Check the tag against Info.plist
+        env:
+          TAG: ${{ inputs.tag }}
+          PUBLISH: ${{ inputs.publish }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          plist="Sources/Lidglow/Resources/Info.plist"
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")"
+          build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
+          label="$(/usr/libexec/PlistBuddy -c 'Print :LidglowReleaseLabel' "$plist" 2>/dev/null || true)"
+          # Tags always use three numbers, so a 1.0 release is tagged v1.0.0.
+          tag_version="$version"
+          [[ "$tag_version" =~ ^[0-9]+\.[0-9]+$ ]] && tag_version="$tag_version.0"
+          if [[ -n "$label" ]]; then
+            [[ "$label" == "Beta" ]] || fail "Unexpected LidglowReleaseLabel \"$label\" in Info.plist."
+            [[ "$TAG" == "v$tag_version-beta."* && "${TAG##*-beta.}" =~ ^[1-9][0-9]*$ ]] \
+              || fail "Info.plist says $version Beta, so the tag must look like v$tag_version-beta.1, not $TAG."
+            display="$version Beta ${TAG##*-beta.}"
+          else
+            [[ "$TAG" == "v$tag_version" ]] \
+              || fail "Info.plist says $version, so the tag must be v$tag_version, not $TAG."
+            display="$version"
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            fail "The tag $TAG already exists."
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            fail "A release (or draft) for $TAG already exists."
+          fi
+          # The release notes come from the CHANGELOG.md section headed "## <version>", for example
+          # "## 0.9.0 Beta 1" or "## 1.0", optionally followed by a date.
+          awk -v heading="## $display" '
+            index($0, heading) == 1 && (length($0) == length(heading) || substr($0, length(heading) + 1, 1) ~ /[ (]/) { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md | sed -e '/./,$!d' > "$RUNNER_TEMP/whats-new.md"
+          if [[ ! -s "$RUNNER_TEMP/whats-new.md" ]]; then
+            [[ "$PUBLISH" != "true" ]] \
+              || fail "CHANGELOG.md has no \"## $display\" section. Move the Unreleased notes under it first."
+            echo "::warning::CHANGELOG.md has no \"## $display\" section, so the draft's What's new is a placeholder."
+            echo "- …" > "$RUNNER_TEMP/whats-new.md"
+          fi
+          echo "Releasing Lidglow $display (build $build) from $GITHUB_SHA as $TAG"
+          echo "DISPLAY_NAME=$display" >> "$GITHUB_ENV"
+
+      - name: Import the signing identity
+        env:
+          P12: ${{ secrets.LIDGLOW_SIGNING_P12 }}
+          P12_PASSWORD: ${{ secrets.LIDGLOW_SIGNING_P12_PASSWORD }}
+        run: |
+          if [[ -z "$P12" || -z "$P12_PASSWORD" ]]; then
+            echo "::error::Add the LIDGLOW_SIGNING_P12 and LIDGLOW_SIGNING_P12_PASSWORD secrets (see docs/RELEASE.md)."
+            exit 1
+          fi
+          keychain="$RUNNER_TEMP/lidglow-signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          printf '%s' "$P12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security import "$RUNNER_TEMP/signing.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm -f -- "$RUNNER_TEMP/signing.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          # A self-signed certificate isn't trusted on a fresh Mac. Trust it for code signing only, so
+          # codesign accepts the identity.
+          security find-certificate -c "$SIGN_IDENTITY" -p "$keychain" > "$RUNNER_TEMP/signing.pem"
+          if ! sudo security add-trusted-cert -d -r trustRoot -p codeSign \
+              -k /Library/Keychains/System.keychain "$RUNNER_TEMP/signing.pem"; then
+            echo "::warning::Couldn't mark the certificate as trusted. Signing may still work."
+          fi
+          security find-identity -p codesigning "$keychain"
+
+      - name: Build the release zip
+        run: LIDGLOW_SIGN_IDENTITY="$SIGN_IDENTITY" Scripts/package.sh
+
+      - name: Check the release zip
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          release="build/release"
+          (cd "$release" && shasum -a 256 -c Lidglow.zip.sha256)
+          zipinfo -1 "$release/Lidglow.zip" | grep -qx LICENSE || fail "Lidglow.zip doesn't contain LICENSE."
+          check="$RUNNER_TEMP/unpacked"
+          ditto -x -k "$release/Lidglow.zip" "$check"
+          codesign --verify --strict "$check/Lidglow.app" || fail "Lidglow.app's signature is invalid."
+          codesign -dvv "$check/Lidglow.app" 2>&1 | grep -qx "Authority=$SIGN_IDENTITY" \
+            || fail "Lidglow.app isn't signed by $SIGN_IDENTITY."
+          zipinfo -1 "$release/Lidglow.zip" | grep -v '^Lidglow.app/'
+
+      - name: Create the release
+        env:
+          TAG: ${{ inputs.tag }}
+          PUBLISH: ${{ inputs.publish }}
+          PRERELEASE: ${{ inputs.prerelease }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          checksum="$(awk '{ print $1; exit }' build/release/Lidglow.zip.sha256)"
+          notes="$RUNNER_TEMP/notes.md"
+          {
+            echo "## Install or update"
+            echo
+            echo "Run this in Terminal (it also updates an existing copy):"
+            echo
+            echo "    curl -fsSL https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/Scripts/install.sh | bash"
+            echo
+            echo "Requires Apple silicon and macOS 27 or later. Lidglow isn't notarized by Apple. The Terminal"
+            echo "installer opens it without a warning. If you download Lidglow.zip in a browser, open it once, then"
+            echo "click Open Anyway in System Settings → Privacy & Security."
+            echo
+            echo "## What's new"
+            echo
+            cat "$RUNNER_TEMP/whats-new.md"
+            echo
+            echo "## Verify"
+            echo
+            echo "SHA-256 of Lidglow.zip: \`$checksum\`"
+            echo
+            echo "Built from [\`${GITHUB_SHA:0:7}\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA) by the Release workflow ([run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)) with \`LIDGLOW_SIGN_IDENTITY=\"$SIGN_IDENTITY\" Scripts/package.sh\`."
+          } > "$notes"
+          flags=()
+          [[ "$PUBLISH" == "true" ]] || flags+=(--draft)
+          [[ "$PRERELEASE" == "true" ]] && flags+=(--prerelease)
+          gh release create "$TAG" build/release/Lidglow.zip build/release/Lidglow.zip.sha256 \
+            --target "$GITHUB_SHA" --title "Lidglow $DISPLAY_NAME" --notes-file "$notes" "${flags[@]}"
+          cat "$notes" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the signing keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/lidglow-signing.keychain-db" 2>/dev/null || true
+          rm -f -- "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/signing.pem"
