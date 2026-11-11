@@ -76,6 +76,19 @@ private struct MusicSection: View {
                 }
                 .sheet(isPresented: $choosingApps) { MusicAppPicker(model: model, apps: apps) }
             }
+            if model.musicSource != .microphone {
+                Toggle(isOn: $model.autoMusic) {
+                    Text("Automatically switch to Music")
+                    Text(model.musicSource == .chosenApps ? "Switches to Music when a chosen app starts playing."
+                                                          : "Switches to Music when any app starts playing.")
+                }
+            }
+            Picker(selection: $model.musicTimeout) {
+                ForEach(MusicTimeout.allCases) { Text($0.title).tag($0) }
+            } label: {
+                Text("Switch back after silence")
+                Text(switchBackExplainer)
+            }
             if model.microphoneDenied {
                 LabeledContent {
                     Button("Open Settings…") {
@@ -102,9 +115,24 @@ private struct MusicSection: View {
         case .chosenApps:
             return "Music mode reacts only to the apps you choose. Safari plays audio through a shared system process, so choose All apps to follow it."
         case .allApps:
-            return "Music mode reacts to everything your Mac plays, including system sounds, videos, and calls."
+            return "Music mode reacts to everything your apps play, including videos and calls. System sounds such as alerts and volume feedback are ignored."
         case .microphone:
-            return "Music mode reacts to sound around your Mac. The microphone stays on while Music is running, and macOS shows its indicator. It turns off when you switch modes, lock your Mac, or close the lid. Lidglow never records or saves what it hears."
+            return "Music mode reacts to sound around your Mac. The microphone stays on while Music is running, and macOS shows its indicator. It turns off when you switch modes, lock your Mac, or close the lid. Lidglow never records or saves what it hears. Automatic switching to Music needs Chosen apps or All apps."
+        }
+    }
+
+    private var switchBackExplainer: String {
+        switch model.musicTimeout {
+        case .automatic where model.musicSource == .chosenApps:
+            return "Returns to the mode you used before Music when the audio stream from all chosen apps stops."
+        case .automatic where model.musicSource == .allApps:
+            return "Returns to the mode you used before Music when every app's audio stream stops."
+        case .automatic:
+            return "Automatically follows apps' audio streams, so with the microphone Music returns to your previous mode after 10 seconds of silence."
+        case .never:
+            return "Music stays on until you pick another mode."
+        default:
+            return "Returns to the mode you used before Music once nothing has played for this long."
         }
     }
 

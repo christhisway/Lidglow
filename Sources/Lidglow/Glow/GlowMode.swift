@@ -28,3 +28,32 @@ enum BreatheSpeed: String, CaseIterable {
         }
     }
 }
+
+/// When Music switches back to the mode used before it: once the chosen apps stop playing, after a
+/// stretch of silence, or never.
+enum MusicTimeout: Int, CaseIterable, Identifiable {
+    case automatic = -1
+    case fiveSeconds = 5
+    case tenSeconds = 10
+    case fifteenSeconds = 15
+    case thirtySeconds = 30
+    case oneMinute = 60
+    case never = 0
+
+    var id: Int { rawValue }
+
+    /// Seconds of silence before switching back, or nil for never and automatic.
+    var seconds: Double? { rawValue > 0 ? Double(rawValue) : nil }
+
+    var title: String {
+        switch self {
+        case .automatic: "Automatically"
+        case .fiveSeconds: "5 seconds"
+        case .tenSeconds: "10 seconds"
+        case .fifteenSeconds: "15 seconds"
+        case .thirtySeconds: "30 seconds"
+        case .oneMinute: "1 minute"
+        case .never: "Never"
+        }
+    }
+}

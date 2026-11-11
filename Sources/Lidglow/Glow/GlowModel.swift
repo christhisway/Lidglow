@@ -49,6 +49,7 @@ final class GlowModel: ObservableObject {
         didSet {
             UserDefaults.standard.set(musicSource.rawValue, forKey: "musicSource")
             applyMusicSource()
+            updatePlaybackWatch()
         }
     }
     /// The user picked Microphone, but macOS doesn't allow Lidglow to use it.
@@ -59,6 +60,7 @@ final class GlowModel: ObservableObject {
         didSet {
             UserDefaults.standard.set(musicApps, forKey: "musicApps")
             applyMusicSource()
+            updatePlaybackWatch()
         }
     }
 
@@ -98,6 +100,28 @@ final class GlowModel: ObservableObject {
         }
     }
 
+    /// Settings → Music → Automatically switch to Music. Off by default. With Chosen apps, those apps
+    /// trigger it. With All apps, any app except alert sounds does. The microphone isn't playback.
+    @Published var autoMusic = UserDefaults.standard.bool(forKey: "autoMusic") {
+        didSet {
+            UserDefaults.standard.set(autoMusic, forKey: "autoMusic")
+            updatePlaybackWatch()
+        }
+    }
+
+    /// Settings → Music → Switch back after silence. It's the only way out of Music other than picking a
+    /// mode, including after an automatic switch. Music returns to the mode used before it once it has
+    /// heard nothing above `SystemMusic.soundThreshold` for this long. Ten seconds by default.
+    @Published var musicTimeout = (UserDefaults.standard.object(forKey: "musicTimeout") as? Int)
+        .flatMap(MusicTimeout.init(rawValue:)) ?? .tenSeconds {
+        didSet {
+            UserDefaults.standard.set(musicTimeout.rawValue, forKey: "musicTimeout")
+            // Count the new limit from now, not from the last sound.
+            musicHeard = nil
+            updatePlaybackWatch()
+        }
+    }
+
     @Published var idleGlow = UserDefaults.standard.bool(forKey: "idleGlow") {
         didSet { UserDefaults.standard.set(idleGlow, forKey: "idleGlow") }
     }
@@ -119,6 +143,7 @@ final class GlowModel: ObservableObject {
     private let logo = LidLogo()
     private let music = SystemMusic()
     private let otherApps = OtherLogoApps()
+    private let playback = PlaybackWatcher()
     private var timer: Timer?
     private var phaseStart = 0.0
     private var sessionActive = true
@@ -126,6 +151,9 @@ final class GlowModel: ObservableObject {
     private var hardwareCheck = 0.0
     private var mayRun = true
     private var lastSignal: Double?
+    /// When Music last heard sound, for the silence timeout. Cleared whenever the glow pauses, so time
+    /// locked, asleep, or with the lid closed doesn't count as silence.
+    private var musicHeard: Double?
     private var latestLevel = 0.0
     /// The preview only needs live levels while the panel is on screen. A hidden SwiftUI host
     /// still lays out on every change, which costs more than the glow loop itself in Music mode.
@@ -166,6 +194,7 @@ final class GlowModel: ObservableObject {
         }
         music.preset = eqPreset
         otherApps.onChange = { [weak self] in self?.otherAppsChanged() }
+        playback.onChange = { [weak self] playing in self?.playbackChanged(playing) }
     }
 
     /// The logo can be controlled: the hardware is there and the private CoreBrightness interface looks
@@ -178,6 +207,8 @@ final class GlowModel: ObservableObject {
     }
 
     private static let modeKey = "glowMode"
+    /// The mode selected before Music, which the silence timeout returns to. Saved so it survives a relaunch.
+    private static let modeBeforeMusicKey = "modeBeforeMusic"
     private static let enabledKey = "glowEnabled"
 
     func restoreSelectedMode() {
@@ -199,6 +230,9 @@ final class GlowModel: ObservableObject {
     }
 
     func select(_ mode: GlowMode) {
+        if mode == .music && self.mode != .music {
+            UserDefaults.standard.set(self.mode.rawValue, forKey: Self.modeBeforeMusicKey)
+        }
         if mode != self.mode { stop() }
         self.mode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: Self.modeKey)
@@ -211,6 +245,40 @@ final class GlowModel: ObservableObject {
         enabled = on
         UserDefaults.standard.set(on, forKey: Self.enabledKey)
         start()
+        updatePlaybackWatch()
+    }
+
+    /// Seconds of silence before Music switches back, or nil when it doesn't count silence. Automatically
+    /// follows apps' audio streams, so with Microphone it falls back to ten seconds of silence.
+    private var silenceLimit: Double? {
+        if musicTimeout == .automatic { return musicSource == .microphone ? 10 : nil }
+        return musicTimeout.seconds
+    }
+
+    /// Watches apps only while switching into or out of Music can act on them: the chosen apps, or every
+    /// app with All apps.
+    private func updatePlaybackWatch() {
+        playback.bundleIDs = musicSource == .allApps ? nil : Set(musicApps)
+        if (autoMusic || musicTimeout == .automatic) && enabled && musicSource != .microphone {
+            playback.start()
+        } else {
+            playback.stop()
+        }
+    }
+
+    /// A chosen app started playing, or every chosen app stopped. Switching in happens only when playback
+    /// starts, so a mode picked by hand while music plays stays until playback stops and starts again.
+    /// Switching out on stop happens only with Switch back after silence set to Automatically.
+    private func playbackChanged(_ playing: Bool) {
+        guard enabled else { return }
+        if playing {
+            guard autoMusic, mode != .music else { return }
+            Logger.audio.notice("Switching to Music automatically")
+            select(.music)
+        } else if musicTimeout == .automatic && mode == .music {
+            Logger.audio.notice("Leaving Music because playback stopped")
+            leaveMusic()
+        }
     }
 
     private func start() {
@@ -308,6 +376,15 @@ final class GlowModel: ObservableObject {
         music.stop()
         logo.restore()
         lastSignal = nil
+        musicHeard = nil
+    }
+
+    /// The silence timeout ran out: go back to the mode selected before Music, as if picked by hand.
+    private func leaveMusic() {
+        guard mode == .music else { return }
+        let previous = UserDefaults.standard.string(forKey: Self.modeBeforeMusicKey)
+            .flatMap(GlowMode.init(rawValue:)).flatMap { $0 == .music ? nil : $0 } ?? .standard
+        select(previous)
     }
 
     @objc private func screenSleep() { displaysAwake = false; pause() }
@@ -349,6 +426,15 @@ final class GlowModel: ObservableObject {
         case .music:
             let signal = music.level(at: now)
             if signal > SystemMusic.soundThreshold { lastSignal = now }
+            if let limit = silenceLimit {
+                if signal > SystemMusic.soundThreshold || musicHeard == nil {
+                    musicHeard = now
+                } else if let heard = musicHeard, now - heard >= limit {
+                    // Switch modes after this tick finishes, rather than restarting the loop inside it.
+                    Logger.audio.notice("Leaving Music after \(Int(limit)) s of silence")
+                    DispatchQueue.main.async { [weak self] in self?.leaveMusic() }
+                }
+            }
             let pulse = min(1, max(0, (signal - SystemMusic.soundThreshold) * sensitivity))
             let base = idleGlow ? min(idleBrightness, brightness * 0.90) : 0
             target = base + (brightness - base) * pulse

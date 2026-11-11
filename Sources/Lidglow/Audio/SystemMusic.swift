@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import CoreAudio
 import Foundation
@@ -32,7 +33,7 @@ final class SystemMusic {
     enum Source: Equatable {
         /// Only these apps' playback, including their helper processes.
         case apps(Set<String>)
-        /// Everything the Mac plays.
+        /// Everything apps play. macOS's own system sounds (alerts, volume feedback) are left out.
         case allApps
         /// The default input device.
         case microphone
@@ -52,9 +53,11 @@ final class SystemMusic {
     private(set) var started = false
     /// Music mode is on, but none of the selected apps has audio open, so there's no tap.
     var waitingForApps: Bool { started && bundleIDs != nil && callback == nil }
+    /// The process list the tap was built from: the apps it includes, or with All apps the system
+    /// processes it excludes. A change rebuilds the tap.
     private var tappedProcesses: [AudioObjectID]?
     private var processListener: AudioObjectPropertyListenerBlock?
-    private static var processListAddress = AudioObjectPropertyAddress(
+    static var processListAddress = AudioObjectPropertyAddress(
         mSelector: kAudioHardwarePropertyProcessObjectList,
         mScope: kAudioObjectPropertyScopeGlobal,
         mElement: kAudioObjectPropertyElementMain)
@@ -93,7 +96,7 @@ final class SystemMusic {
     func start() throws {
         guard !started else { return }
         started = true
-        if bundleIDs != nil { watchProcesses(true) }
+        if source != .microphone { watchProcesses(true) }
         do { try buildTap() } catch { stop(); throw error }
     }
 
@@ -112,13 +115,13 @@ final class SystemMusic {
     }
 
     private func processesChanged() {
-        guard started, let bundleIDs, matchingProcesses(bundleIDs) != tappedProcesses else { return }
+        guard started, source != .microphone, tapProcesses() != tappedProcesses else { return }
         rebuild()
     }
 
     private func rebuild() {
         teardownTap()
-        watchProcesses(bundleIDs != nil)
+        watchProcesses(source != .microphone)
         do { try buildTap() } catch {
             stop()
             onFailure?(error)
@@ -126,8 +129,39 @@ final class SystemMusic {
     }
 
     /// Core Audio's process objects for the selected apps, including their helpers (for example
-    /// `com.google.Chrome.helper`), in a stable order.
-    private func matchingProcesses(_ bundleIDs: Set<String>) -> [AudioObjectID] {
+    /// `com.google.Chrome.helper`), in a stable order. `PlaybackWatcher` uses the same matching.
+    static func processes(matching bundleIDs: Set<String>) -> [AudioObjectID] {
+        guard !bundleIDs.isEmpty else { return [] }
+        return allProcesses().filter { process in
+            guard let id = bundleID(of: process) else { return false }
+            return bundleIDs.contains { id == $0 || id.hasPrefix($0 + ".") }
+        }
+    }
+
+    /// The processes the tap is built from: the selected apps to include, or with All apps the system
+    /// processes to exclude.
+    private func tapProcesses() -> [AudioObjectID] {
+        bundleIDs.map(Self.processes(matching:)) ?? Self.allProcesses().filter { !Self.isAppAudio($0) }
+    }
+
+    /// Apple's own media helpers that carry app playback: WebKit plays Safari's (and other web views')
+    /// audio in its GPU process.
+    private static let appleMediaHelpers: Set<String> = ["com.apple.WebKit.GPU", "com.apple.WebKit.WebContent"]
+
+    /// Whether a process plays on behalf of an app, for All apps. That's any third-party process, any
+    /// regular Apple app (Music, TV, QuickTime Player, FaceTime), and WebKit's media helpers. It leaves out
+    /// Lidglow itself, whose tap runs audio input while Music is on, and macOS's system processes, which
+    /// play alerts, volume-change feedback (`com.apple.MediaRemoteUIService`), and other interface sounds
+    /// (`systemsoundserverd` and the like). Processes without a reverse-DNS bundle ID are system daemons.
+    static func isAppAudio(_ process: AudioObjectID) -> Bool {
+        guard let pid = pid(of: process), pid != ProcessInfo.processInfo.processIdentifier,
+              let id = bundleID(of: process), id.contains(".") else { return false }
+        if !id.hasPrefix("com.apple.") || appleMediaHelpers.contains(id) { return true }
+        return NSRunningApplication(processIdentifier: pid)?.activationPolicy == .regular
+    }
+
+    /// Every process Core Audio knows about, in a stable order.
+    static func allProcesses() -> [AudioObjectID] {
         let system = AudioObjectID(kAudioObjectSystemObject)
         var size: UInt32 = 0
         guard AudioObjectGetPropertyDataSize(system, &Self.processListAddress, 0, nil, &size) == noErr, size > 0 else {
@@ -137,16 +171,26 @@ final class SystemMusic {
         guard AudioObjectGetPropertyData(system, &Self.processListAddress, 0, nil, &size, &processes) == noErr else {
             return []
         }
-        return processes.prefix(Int(size) / MemoryLayout<AudioObjectID>.size).filter { process in
-            var address = AudioObjectPropertyAddress(mSelector: kAudioProcessPropertyBundleID,
-                                                     mScope: kAudioObjectPropertyScopeGlobal,
-                                                     mElement: kAudioObjectPropertyElementMain)
-            var name: Unmanaged<CFString>?
-            var nameSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
-            guard AudioObjectGetPropertyData(process, &address, 0, nil, &nameSize, &name) == noErr,
-                  let id = name?.takeRetainedValue() as String? else { return false }
-            return bundleIDs.contains { id == $0 || id.hasPrefix($0 + ".") }
-        }.sorted()
+        return processes.prefix(Int(size) / MemoryLayout<AudioObjectID>.size).sorted()
+    }
+
+    static func bundleID(of process: AudioObjectID) -> String? {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioProcessPropertyBundleID,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var name: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(process, &address, 0, nil, &size, &name) == noErr else { return nil }
+        return name?.takeRetainedValue() as String?
+    }
+
+    static func pid(of process: AudioObjectID) -> pid_t? {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioProcessPropertyPID,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var pid: pid_t = 0
+        var size = UInt32(MemoryLayout<pid_t>.size)
+        return AudioObjectGetPropertyData(process, &address, 0, nil, &size, &pid) == noErr ? pid : nil
     }
 
     private func buildTap() throws {
@@ -155,13 +199,15 @@ final class SystemMusic {
             try buildMicrophone()
             return
         }
-        let processes = bundleIDs.map(matchingProcesses)
+        let processes = tapProcesses()
         tappedProcesses = processes
         // None of the selected apps has audio open. Stay down until the process list changes.
-        if processes?.isEmpty == true { return }
+        if bundleIDs != nil && processes.isEmpty { return }
         do {
-            let description = processes.map { CATapDescription(monoMixdownOfProcesses: $0) }
-                ?? CATapDescription(monoGlobalTapButExcludeProcesses: [])
+            // All apps taps everything except macOS's system sounds, so alerts and volume feedback never
+            // reach the light.
+            let description = bundleIDs != nil ? CATapDescription(monoMixdownOfProcesses: processes)
+                                               : CATapDescription(monoGlobalTapButExcludeProcesses: processes)
             description.name = "Lidglow Music"
             description.isPrivate = true
             description.muteBehavior = .unmuted
