@@ -1,23 +1,21 @@
-import AVFoundation
 import CoreAudio
 import Foundation
 import os
 
 /// Where Music mode listens, as chosen in Settings → Music.
 enum MusicSource: String, CaseIterable, Identifiable {
-    case chosenApps, allApps, microphone
+    case chosenApps, allApps
     var id: Self { self }
     var title: String {
         switch self {
         case .chosenApps: return "Chosen apps"
         case .allApps: return "All apps"
-        case .microphone: return "Microphone"
         }
     }
 }
 
-/// Music mode's sound source: the chosen apps' playback, all system audio, or, only when the user picks it,
-/// the microphone. Either way the samples are reduced to a level on the audio thread and discarded.
+/// Music mode's sound source: the chosen apps' playback or all system audio. The samples are reduced to a
+/// level on the audio thread and discarded.
 final class SystemMusic {
     struct TapError: LocalizedError {
         var operation: String
@@ -25,17 +23,11 @@ final class SystemMusic {
         var errorDescription: String? { "\(operation) failed (\(status)). Check System Audio Recording permission, then try again." }
     }
 
-    struct MicrophoneError: LocalizedError {
-        var errorDescription: String?
-    }
-
     enum Source: Equatable {
         /// Only these apps' playback, including their helper processes.
         case apps(Set<String>)
         /// Everything the Mac plays.
         case allApps
-        /// The default input device.
-        case microphone
     }
 
     var source = Source.apps(["com.spotify.client", "com.apple.Music"]) {
@@ -62,8 +54,6 @@ final class SystemMusic {
     private var tap = AudioObjectID(kAudioObjectUnknown)
     private var device = AudioObjectID(kAudioObjectUnknown)
     private var callback: AudioDeviceIOProcID?
-    private var microphone: AVAudioEngine?
-    private var microphoneObserver: NSObjectProtocol?
     private let lock = NSLock()
     private var latest = (time: 0.0, level: 0.0)
     private var wakeArmed = false
@@ -88,8 +78,6 @@ final class SystemMusic {
 
     /// Starts listening. With selected apps, the tap is built when one of them has audio open and
     /// rebuilt as they come and go, from Core Audio's own process list notification, never polling.
-    /// With the microphone, the input stays open until `stop()`, which the model calls whenever Music
-    /// pauses (lock, sleep, lid closed) or another mode is chosen.
     func start() throws {
         guard !started else { return }
         started = true
@@ -150,11 +138,6 @@ final class SystemMusic {
     }
 
     private func buildTap() throws {
-        if source == .microphone {
-            tappedProcesses = nil
-            try buildMicrophone()
-            return
-        }
         let processes = bundleIDs.map(matchingProcesses)
         tappedProcesses = processes
         // None of the selected apps has audio open. Stay down until the process list changes.
@@ -210,43 +193,6 @@ final class SystemMusic {
         }
     }
 
-    /// Opens the default input device. The model only selects this source once macOS has granted
-    /// microphone access, but access can be revoked later, so check again.
-    private func buildMicrophone() throws {
-        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
-            throw MicrophoneError(errorDescription: "Microphone access is off. Allow Lidglow under Privacy & Security → Microphone, then try again.")
-        }
-        let engine = AVAudioEngine()
-        let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
-            throw MicrophoneError(errorDescription: "No microphone is available.")
-        }
-        var meter = BeatMeter(sampleRate: format.sampleRate)
-        meter.preset = preset
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-            // The first channel is enough for a level, and works for mono and stereo inputs alike.
-            guard let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
-            let level = meter.process(samples, frames: Int(buffer.frameLength), channels: 1)
-            self?.publish(level, meter: &meter)
-        }
-        do {
-            try engine.start()
-        } catch {
-            input.removeTap(onBus: 0)
-            Logger.audio.error("Microphone input failed: \(error.localizedDescription, privacy: .public)")
-            throw MicrophoneError(errorDescription: "Couldn't start the microphone (\(error.localizedDescription)).")
-        }
-        microphone = engine
-        // A new default input (headphones plugged in, for example) stops the engine. Rebuild on it.
-        microphoneObserver = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
-            guard let self, self.started, self.source == .microphone else { return }
-            self.rebuild()
-        }
-        Logger.audio.notice("Microphone input started at \(format.sampleRate) Hz")
-    }
-
     /// Hands a new level to the glow loop. Runs on the audio thread and never waits on the lock, so a
     /// busy main thread can't stall audio. A preset change reaches the meter from the next buffer.
     private func publish(_ level: Double, meter: inout BeatMeter) {
@@ -273,14 +219,6 @@ final class SystemMusic {
 
     private func teardownTap() {
         tappedProcesses = nil
-        if let microphoneObserver { NotificationCenter.default.removeObserver(microphoneObserver) }
-        microphoneObserver = nil
-        if let microphone {
-            microphone.inputNode.removeTap(onBus: 0)
-            microphone.stop()
-            Logger.audio.notice("Microphone input stopped")
-        }
-        microphone = nil
         if callback != nil { Logger.audio.notice("System audio tap stopped") }
         if let callback {
             AudioDeviceStop(device, callback)

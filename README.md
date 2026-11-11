@@ -6,10 +6,10 @@ Lidglow is a native macOS menu-bar app for the illuminated Apple logo on MacBook
 
 1. Quit any other app that controls the lid logo, so that only one app sends brightness commands. Lidglow also watches for this itself. If another app changes the logo while Lidglow holds it, Lidglow hands the logo back to macOS and asks you to quit that app. A few logo apps are recognized by name: while one of them is running, Lidglow leaves the logo alone, says so in its panel, and takes over when it quits.
 2. Open **Lidglow.app** in Finder. Click the waveform circle in the macOS menu bar to open its controls, and turn on the switch in the panel's top-right corner. Click the gear next to the switch (or press ⌘, while the panel is open) for **Settings**, which shows the version and project links. Control-click or right-click the icon for **Open Settings…** and **Quit Lidglow**.
-3. Choose **Music**, allow macOS system audio capture when prompted, and play music. By default Music reacts only to **Spotify** and **Apple Music**. In **Settings → Music**, **Listen to** switches between **Chosen apps** (click **Choose…** to pick them), **All apps**, and **Microphone**, which reacts to sound around your Mac and is off by default. **Brightness** sets the peak glow and **Sensitivity** adjusts how strongly hits drive it. **Focus** picks what drives the glow: **Bass** (kick drums and bass lines, the default), **Mids** (vocals, guitars, keys, and snares), **Treble** (hi-hats and cymbals), or **Full** (the whole mix). Turn on **Idle glow** to keep a base between beats and tracks. Use **Idle brightness** to raise or lower it.
+3. Choose **Music**, allow macOS system audio capture when prompted, and play music. By default Music reacts only to **Spotify** and **Apple Music**. In **Settings → Music**, **Listen to** switches between **Chosen apps** (click **Choose…** to pick them) and **All apps**. **Brightness** sets the peak glow and **Sensitivity** adjusts how strongly hits drive it. **Focus** picks what drives the glow: **Bass** (kick drums and bass lines, the default), **Mids** (vocals, guitars, keys, and snares), **Treble** (hi-hats and cymbals), or **Full** (the whole mix). Turn on **Idle glow** to keep a base between beats and tracks. Use **Idle brightness** to raise or lower it.
 4. Turn the switch off to hand brightness back to macOS. **Standard** holds the logo at the chosen brightness (drag **Brightness** all the way down to turn it off), and **Breathe** fades it up and down. Choose a **Speed** of Slow, Normal, or Fast under Brightness.
 
-If Music remains on “Waiting for music” during playback, check that the app you're playing from is chosen in **Settings → Music**. Otherwise use **System Audio Settings…** to check Lidglow’s access under **Privacy & Security → Screen & System Audio Recording**. With **Microphone**, the same button opens **Microphone Settings…** instead. After changing access, reselect **Music** or quit and reopen Lidglow.
+If Music remains on “Waiting for music” during playback, check that the app you're playing from is chosen in **Settings → Music**. Otherwise use **System Audio Settings…** to check Lidglow’s access under **Privacy & Security → Screen & System Audio Recording**. After changing access, reselect **Music** or quit and reopen Lidglow.
 
 If the lid logo is stuck dim, dark, or at one level (for example after Lidglow crashed or was force quit), open Lidglow again. It notices that it didn't hand the logo back and repairs it at launch, even with the switch off. If the logo still looks wrong, quit Lidglow normally and restart your Mac.
 
@@ -23,7 +23,7 @@ To update, quit Lidglow from the panel or its Control-click menu so it hands the
 
 ## Privacy
 
-Lidglow records nothing and has no network code. Music mode reduces your Mac's audio output to a brightness level as it plays and then discards it. It uses the microphone only if you choose **Microphone** as Music's source, and only while Music is running. Settings are stored only in macOS preferences. Read the full [privacy statement](PRIVACY.md).
+Lidglow uses no microphone, records nothing, and has no network code. Music mode reduces your Mac's audio output to a brightness level as it plays and then discards it. Settings are stored only in macOS preferences. Read the full [privacy statement](PRIVACY.md).
 
 ## Reporting bugs
 
@@ -47,7 +47,7 @@ Sources/Lidglow/
   UI/         SwiftUI controls, shared Liquid Glass styling, the borderless menu panel, the Settings window, and the animated laptop preview
   Audio/      Core Audio process tap and the BeatMeter detector
   Hardware/   Lid logo control, detection of other apps controlling the logo, laptop finish detection, and the Objective-C CoreBrightness bridge
-  Resources/  Info.plist and the entitlements used for hardened-runtime signing
+  Resources/  Info.plist
 Tests/BeatMeterTests/  Synthetic beat detector check
 Scripts/      build.sh and test.sh
 docs/         Handoff notes and the end-user install guide

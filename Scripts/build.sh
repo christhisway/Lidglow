@@ -22,9 +22,7 @@ xcrun swiftc -target "$target" -sdk "$sdk" -module-cache-path "$module_cache" -O
 sign_identity="${LIDGLOW_SIGN_IDENTITY:--}"
 sign_options=()
 if [[ "$sign_identity" != "-" ]]; then
-    # The hardened runtime blocks microphone input unless the app declares it. Lidglow only opens the
-    # microphone when the user chooses it as Music's source.
-    sign_options=(--options runtime --timestamp --entitlements "$src/Resources/Lidglow.entitlements")
+    sign_options=(--options runtime --timestamp)
 fi
 codesign --force --sign "$sign_identity" "${sign_options[@]}" "$destination"
 codesign --verify --strict "$destination"
