@@ -2,7 +2,7 @@
 
 Each release is also published on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with these notes. **Settings → About → Check for Updates** installs the latest stable release. See [Install](../README.md#install).
 
-## Unreleased
+## 0.9.0 Beta 1
 
 ### Added
 - A Settings window, opened from the gear in the panel, ⌘, while the panel is open, or the menu-bar icon's Control-click menu. It shows the version and links to the project and its releases.
