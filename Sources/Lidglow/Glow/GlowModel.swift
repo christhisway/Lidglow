@@ -100,8 +100,8 @@ final class GlowModel: ObservableObject {
         }
     }
 
-    /// Settings → Music → Automatically switch to Music. Off by default. Only the chosen apps trigger it:
-    /// All apps would switch on every alert, video, and call, and the microphone isn't playback.
+    /// Settings → Music → Automatically switch to Music. Off by default. With Chosen apps, those apps
+    /// trigger it. With All apps, any app except alert sounds does. The microphone isn't playback.
     @Published var autoMusic = UserDefaults.standard.bool(forKey: "autoMusic") {
         didSet {
             UserDefaults.standard.set(autoMusic, forKey: "autoMusic")
@@ -249,16 +249,17 @@ final class GlowModel: ObservableObject {
     }
 
     /// Seconds of silence before Music switches back, or nil when it doesn't count silence. Automatically
-    /// follows the chosen apps, so with All apps or Microphone it falls back to ten seconds of silence.
+    /// follows apps' audio streams, so with Microphone it falls back to ten seconds of silence.
     private var silenceLimit: Double? {
-        if musicTimeout == .automatic { return musicSource == .chosenApps ? nil : 10 }
+        if musicTimeout == .automatic { return musicSource == .microphone ? 10 : nil }
         return musicTimeout.seconds
     }
 
-    /// Watches the chosen apps only while switching into or out of Music can act on them.
+    /// Watches apps only while switching into or out of Music can act on them: the chosen apps, or every
+    /// app with All apps.
     private func updatePlaybackWatch() {
-        playback.bundleIDs = Set(musicApps)
-        if (autoMusic || musicTimeout == .automatic) && enabled && musicSource == .chosenApps {
+        playback.bundleIDs = musicSource == .allApps ? nil : Set(musicApps)
+        if (autoMusic || musicTimeout == .automatic) && enabled && musicSource != .microphone {
             playback.start()
         } else {
             playback.stop()
@@ -275,7 +276,7 @@ final class GlowModel: ObservableObject {
             Logger.audio.notice("Switching to Music automatically")
             select(.music)
         } else if musicTimeout == .automatic && mode == .music {
-            Logger.audio.notice("Leaving Music because the chosen apps stopped playing")
+            Logger.audio.notice("Leaving Music because playback stopped")
             leaveMusic()
         }
     }

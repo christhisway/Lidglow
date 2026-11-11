@@ -2,7 +2,8 @@ import CoreAudio
 import Foundation
 import os
 
-/// Tells whether any of the chosen music apps is playing, for switching to Music automatically.
+/// Tells whether any of the chosen music apps, or with All apps any app, is playing, for switching into
+/// and out of Music automatically.
 /// It reads Core Audio's per-process `kAudioProcessPropertyIsRunning`, which says whether a process has
 /// audio I/O running. That is "playing" as opposed to "silent", so quiet passages don't count as stopped.
 /// `kAudioProcessPropertyIsRunningOutput` would be more precise, but on macOS 27 its listeners never fire
@@ -10,8 +11,10 @@ import os
 /// about 2 s later, on pause. It needs no tap and never touches audio. Everything is driven by property
 /// listeners on the process objects and on the process list, with no polling.
 final class PlaybackWatcher {
-    /// Apps to watch, matched with their helpers exactly as Music's tap matches them.
-    var bundleIDs: Set<String> = [] {
+    /// Apps to watch, matched with their helpers exactly as Music's tap matches them. Nil watches every
+    /// app except Lidglow, whose own tap runs audio input while Music is on, and the system sound server,
+    /// so alert and notification sounds don't count as playing.
+    var bundleIDs: Set<String>? = [] {
         didSet { if watching && bundleIDs != oldValue { refresh() } }
     }
     /// Called on the main queue when `playing` changes.
@@ -58,7 +61,7 @@ final class PlaybackWatcher {
     /// Follows apps as they open and close audio, then rechecks whether any of them is playing.
     private func refresh() {
         guard watching else { return }
-        let processes = Set(SystemMusic.processes(matching: bundleIDs))
+        let processes = Set(bundleIDs.map(SystemMusic.processes(matching:)) ?? Self.otherApps())
         for (process, listener) in watched where !processes.contains(process) {
             // A process that has gone away has already dropped its listeners, so a failure here is fine.
             AudioObjectRemovePropertyListenerBlock(process, &Self.runningAddress, .main, listener)
@@ -78,8 +81,15 @@ final class PlaybackWatcher {
         let now = watched.keys.contains(where: Self.isRunning)
         guard now != playing else { return }
         playing = now
-        Logger.audio.notice("Chosen music apps \(now ? "started" : "stopped", privacy: .public) playing")
+        Logger.audio.notice("\(self.bundleIDs == nil ? "Apps" : "Chosen music apps", privacy: .public) \(now ? "started" : "stopped", privacy: .public) playing")
         onChange?(now)
+    }
+
+    private static func otherApps() -> [AudioObjectID] {
+        let own = ProcessInfo.processInfo.processIdentifier
+        return SystemMusic.allProcesses().filter { process in
+            SystemMusic.pid(of: process) != own && SystemMusic.bundleID(of: process) != "systemsoundserverd"
+        }
     }
 
     private static func isRunning(_ process: AudioObjectID) -> Bool {

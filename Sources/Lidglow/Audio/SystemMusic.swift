@@ -129,6 +129,14 @@ final class SystemMusic {
     /// `com.google.Chrome.helper`), in a stable order. `PlaybackWatcher` uses the same matching.
     static func processes(matching bundleIDs: Set<String>) -> [AudioObjectID] {
         guard !bundleIDs.isEmpty else { return [] }
+        return allProcesses().filter { process in
+            guard let id = bundleID(of: process) else { return false }
+            return bundleIDs.contains { id == $0 || id.hasPrefix($0 + ".") }
+        }
+    }
+
+    /// Every process Core Audio knows about, in a stable order.
+    static func allProcesses() -> [AudioObjectID] {
         let system = AudioObjectID(kAudioObjectSystemObject)
         var size: UInt32 = 0
         guard AudioObjectGetPropertyDataSize(system, &Self.processListAddress, 0, nil, &size) == noErr, size > 0 else {
@@ -138,16 +146,26 @@ final class SystemMusic {
         guard AudioObjectGetPropertyData(system, &Self.processListAddress, 0, nil, &size, &processes) == noErr else {
             return []
         }
-        return processes.prefix(Int(size) / MemoryLayout<AudioObjectID>.size).filter { process in
-            var address = AudioObjectPropertyAddress(mSelector: kAudioProcessPropertyBundleID,
-                                                     mScope: kAudioObjectPropertyScopeGlobal,
-                                                     mElement: kAudioObjectPropertyElementMain)
-            var name: Unmanaged<CFString>?
-            var nameSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
-            guard AudioObjectGetPropertyData(process, &address, 0, nil, &nameSize, &name) == noErr,
-                  let id = name?.takeRetainedValue() as String? else { return false }
-            return bundleIDs.contains { id == $0 || id.hasPrefix($0 + ".") }
-        }.sorted()
+        return processes.prefix(Int(size) / MemoryLayout<AudioObjectID>.size).sorted()
+    }
+
+    static func bundleID(of process: AudioObjectID) -> String? {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioProcessPropertyBundleID,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var name: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(process, &address, 0, nil, &size, &name) == noErr else { return nil }
+        return name?.takeRetainedValue() as String?
+    }
+
+    static func pid(of process: AudioObjectID) -> pid_t? {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioProcessPropertyPID,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var pid: pid_t = 0
+        var size = UInt32(MemoryLayout<pid_t>.size)
+        return AudioObjectGetPropertyData(process, &address, 0, nil, &size, &pid) == noErr ? pid : nil
     }
 
     private func buildTap() throws {
