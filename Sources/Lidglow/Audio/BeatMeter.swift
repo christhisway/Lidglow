@@ -2,22 +2,28 @@ import Foundation
 
 /// Which part of the spectrum drives the glow in Music mode.
 ///
-/// Bass, Vocals, and Treble each listen to one narrow band with steep (24 dB per octave) filters:
-/// kicks and bass notes at 40–120 Hz, the vocal formant range at 300 Hz–3 kHz, and cymbal sizzle above
+/// Bass, Mids, and Treble each listen to one narrow band with steep (24 dB per octave) filters:
+/// kicks and bass notes at 40–120 Hz, the midrange where vocals, guitars, keys, and snares live at
+/// 300 Hz–3 kHz, and cymbal sizzle above
 /// 6 kHz. Each is a little tighter than the usual mixing ranges, so neighboring instruments leak in as
 /// little as possible. A hit in one of these bands only counts when that band carries a real share of
 /// the onset across the whole mix (see `share`), so a guitar strum's sliver of low end doesn't flash the
 /// logo in Bass. Full is the original wide detector, unchanged.
 enum EQPreset: String, CaseIterable {
     case bass = "Bass"
-    case vocals = "Vocals"
+    case mids = "Mids"
     case treble = "Treble"
     case flat = "Full"
+
+    /// Reads a saved preset, including names from earlier builds.
+    init?(saved: String) {
+        self.init(rawValue: saved == "Vocals" ? EQPreset.mids.rawValue : saved)
+    }
 
     var detail: String {
         switch self {
         case .bass: "Kick drums and bass lines"
-        case .vocals: "Vocals, snares, and melody"
+        case .mids: "Vocals, guitars, keys, and snares"
         case .treble: "Hi-hats and cymbals"
         case .flat: "The whole mix"
         }
@@ -91,7 +97,7 @@ struct BeatMeter {
     private var drumBand = Band(floor: 0.009, gain: 1)
     private var trebleBand = Band(floor: 0.006, gain: 1)
 
-    // Bass, Vocals, and Treble: narrow bands, plus the whole mix to measure each band's share of a hit.
+    // Bass, Mids, and Treble: narrow bands, plus the whole mix to measure each band's share of a hit.
     private var kickFilters: [Biquad]
     private var voiceFilters: [Biquad]
     private var hatFilters: [Biquad]
@@ -113,8 +119,8 @@ struct BeatMeter {
         // but carry most of their energy well above, so stop at 120 Hz.
         kickFilters = [Biquad(highPass: 40, sampleRate: sampleRate),
                        Biquad(lowPass: 120, sampleRate: sampleRate), Biquad(lowPass: 120, sampleRate: sampleRate)]
-        // Vocals span roughly 100 Hz–8 kHz. Their formants and intelligibility sit at 300 Hz–3 kHz,
-        // clear of kicks, bass, and most cymbal sizzle.
+        // The midrange: vocal formants, guitars, keys, and snare body and crack mostly sit at
+        // 300 Hz–3 kHz, clear of kicks, bass, and most cymbal sizzle.
         voiceFilters = [Biquad(highPass: 300, sampleRate: sampleRate), Biquad(highPass: 300, sampleRate: sampleRate),
                         Biquad(lowPass: 3000, sampleRate: sampleRate), Biquad(lowPass: 3000, sampleRate: sampleRate)]
         // Hi-hat and cymbal sizzle is about 6–10 kHz and up. Starting at 6 kHz leaves out snare crack
@@ -185,7 +191,7 @@ struct BeatMeter {
         let hit: Float
         switch preset {
         case .bass: hit = kick * share(kickBand)
-        case .vocals: hit = voice * share(voiceBand)
+        case .mids: hit = voice * share(voiceBand)
         case .treble: hit = hat * share(hatBand)
         case .flat: hit = max(bass, drums * 0.85, treble * 0.85)
         }

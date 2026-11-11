@@ -22,7 +22,7 @@ final class GlowModel: ObservableObject {
     }
 
     @Published var eqPreset = UserDefaults.standard.string(forKey: "eqPreset")
-        .flatMap(EQPreset.init(rawValue:)) ?? .bass {
+        .flatMap(EQPreset.init(saved:)) ?? .bass {
         didSet {
             UserDefaults.standard.set(eqPreset.rawValue, forKey: "eqPreset")
             music.preset = eqPreset

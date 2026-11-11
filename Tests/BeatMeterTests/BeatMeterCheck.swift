@@ -54,7 +54,7 @@ enum BeatMeterCheck {
                 case .bass:
                     // Kicks only. Snares, hats, and a guitar note must not flash the logo.
                     precondition(r.kick > 0.85 && r.snare < 0.3 && r.hat < 0.2 && r.guitar < 0.25)
-                case .vocals:
+                case .mids:
                     precondition(r.snare > 0.85 && r.kick < 0.3 && r.hat < 0.3)
                 case .treble:
                     precondition(r.hat > 0.85 && r.kick < 0.3 && r.snare < 0.3 && r.guitar < 0.3)
