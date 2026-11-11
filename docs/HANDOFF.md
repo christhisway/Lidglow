@@ -9,7 +9,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 - Music uses a private Core Audio process tap to meter system playback, with separate bass and drum transient detection. It uses no microphone, stores no recordings, and has no network code.
 - Idle glow sets a base between hits and tracks, capped at 90% of the chosen peak so beats can still brighten the logo. The preview and physical LED both glow white.
 - Each opening of the panel replays the laptop animation, then switches to a 2D logo that follows the live brightness. Reduce Motion goes directly to the 2D view.
-- Music and logo control pause on session lock, sleep, or lid closure. Normal quit restores macOS control. Unsupported hardware uses the preview.
+- Music and logo control pause on session lock, sleep, or lid closure. Normal quit restores macOS control. Unsupported hardware uses the preview. So does a missing or changed CoreBrightness interface (`LogoBridge.serviceAvailable` is NO), with the status “Preview only · Lid logo service unavailable”.
 
 ## Source map
 
@@ -29,7 +29,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `Audio/BeatMeter.swift` | Bass and drum transient detection |
 | `Hardware/LidLogo.swift` | Logo brightness transitions, original state tracking, and restoration |
 | `Hardware/LaptopFinish.swift` | Automatic laptop finish detection |
-| `Hardware/LogoBridge.h`, `.m` | IOKit hardware detection and dynamically loaded CoreBrightness calls |
+| `Hardware/LogoBridge.h`, `.m` | IOKit hardware detection and dynamically loaded CoreBrightness calls, with type checks and exception guards so a changed interface reads as unavailable |
 | `Resources/Info.plist` | Version, bundle ID, menu-bar activation, deployment target, and audio permission text |
 
 Paths are relative to `Sources/Lidglow/`. Outside it, `Scripts/build.sh` builds and signs the app, `Scripts/test.sh` runs `Tests/BeatMeterTests/BeatMeterCheck.swift` (synthetic checks for kick and snare response, steady audio, and silence).

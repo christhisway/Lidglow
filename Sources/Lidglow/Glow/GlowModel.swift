@@ -78,9 +78,12 @@ final class GlowModel: ObservableObject {
         music.onSound = { [weak self] in self?.speedUp() }
     }
 
-    var hasHardware: Bool { logo.bridge.hardwarePresent }
+    /// The logo can be controlled: the hardware is there and the private CoreBrightness interface looks
+    /// as expected. Otherwise everything runs as a preview and nothing is sent to the logo.
+    var hasHardware: Bool { logo.bridge.hardwarePresent && logo.bridge.serviceAvailable }
     private var idleStatus: String {
-        if !hasHardware { return "Preview only · No controllable lid logo found" }
+        if !logo.bridge.hardwarePresent { return "Preview only · No controllable lid logo found" }
+        if !logo.bridge.serviceAvailable { return "Preview only · Lid logo service unavailable" }
         return logo.available ? "macOS is managing the lid logo" : "Lid logo service unavailable"
     }
 
