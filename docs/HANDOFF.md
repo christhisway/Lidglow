@@ -15,7 +15,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 
 | File | Role |
 | --- | --- |
-| `App/Main.swift` | Entry point; starts the accessory (menu-bar) app |
+| `App/Main.swift` | Entry point; starts the accessory (menu-bar) app, or only unregisters the login item for the uninstaller |
 | `App/LidglowApp.swift` | Application delegate: status item and its context menu, panel window, positioning, event monitors, Settings window |
 | `Glow/GlowMode.swift` | The modes and their icons |
 | `Glow/GlowModel.swift` | Mode and settings state, tick loop, session lifecycle |
@@ -32,7 +32,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `Hardware/LogoBridge.h`, `.m` | IOKit hardware detection and dynamically loaded CoreBrightness calls |
 | `Resources/Info.plist` | Version, bundle ID, menu-bar activation, deployment target, and audio permission text |
 
-Paths are relative to `Sources/Lidglow/`. Outside it, `Scripts/build.sh` builds and signs the app, `Scripts/package.sh` makes the release zip and its SHA-256, `Scripts/install.sh` is the Terminal installer and updater, `docs/RELEASE.md` is the release checklist, `Scripts/test.sh` runs `Tests/BeatMeterTests/BeatMeterCheck.swift` (synthetic checks for kick and snare response, steady audio, and silence).
+Paths are relative to `Sources/Lidglow/`. Outside it, `Scripts/build.sh` builds and signs the app, `Scripts/package.sh` makes the release zip and its SHA-256, `Scripts/install.sh` is the Terminal installer and updater, `Scripts/uninstall.sh` removes the app, its login item, and its settings (it runs `Lidglow --unregister-login-item`, handled in `App/Main.swift`), `docs/RELEASE.md` is the release checklist, `Scripts/test.sh` runs `Tests/BeatMeterTests/BeatMeterCheck.swift` (synthetic checks for kick and snare response, steady audio, and silence).
 
 ## Build and verify
 

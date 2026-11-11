@@ -23,6 +23,19 @@ Apple silicon Macs can use the on-screen preview.
 
 To open Lidglow when you log in, turn on Settings > General > Open at Login.
 
+Uninstall
+Quit Lidglow first (Quit in its panel), so it hands the logo back to macOS.
+Then either run this in Terminal:
+
+  curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/uninstall.sh | bash
+
+or delete Lidglow.app from Applications. Optional cleanup:
+- Settings: run  defaults delete io.github.christhisway.lidglow
+- Audio permission: System Settings > Privacy & Security > Screen & System
+  Audio Recording
+- Login item: System Settings > General > Login Items
+If the logo still looks wrong afterwards, restart your Mac.
+
 If macOS blocks the first launch
 Lidglow isn't notarized by Apple. The Terminal installer avoids this warning.
 If you installed from a browser download, try to open the app once, then go to
