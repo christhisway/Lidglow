@@ -88,7 +88,9 @@ struct GlowPanel: View {
                 Button("Quit") { NSApp.terminate(nil) }.controlSize(.small)
             }
             if model.mode == .music {
-                Button("System Audio Settings…") { model.openAudioSettings() }
+                Button(model.musicSource == .microphone ? "Microphone Settings…" : "System Audio Settings…") {
+                    model.openAudioSettings()
+                }
                     .buttonStyle(.link).font(.subheadline)
                     .transition(reveal)
             }

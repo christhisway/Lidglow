@@ -13,5 +13,7 @@
     <key>LSUIElement</key><true/>
     <key>NSAudioCaptureUsageDescription</key>
     <string>Lidglow turns your Mac’s audio output into a brightness level for the lid logo as it plays. Audio is never recorded, saved, or sent anywhere.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>When you choose Microphone in Music settings, Lidglow turns the sound around your Mac into a brightness level for the lid logo. Audio is never recorded, saved, or sent anywhere.</string>
 </dict>
 </plist>
