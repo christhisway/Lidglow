@@ -50,7 +50,7 @@ Sources/Lidglow/
   Resources/  Info.plist and the entitlements used for Developer ID (hardened-runtime) signing
 Tests/BeatMeterTests/  Synthetic beat detector check
 Scripts/      build.sh, test.sh, package.sh (release zip and checksum), install.sh (the Terminal installer, also bundled in the app for Check for Updates), and uninstall.sh
-docs/         Handoff notes, the end-user install guide, the release checklist, the changelog, and the contributing, security, and privacy notes
+docs/         Architecture notes (behavior, source map, manual checks), the release checklist, the changelog, and the contributing, security, and privacy notes
 .github/      Issue templates and the Release workflow, which builds a draft release from main when started by hand
 ```
 
@@ -73,7 +73,7 @@ These keep Lidglow safe to leave running all day. Pull requests that break them 
 - **Privacy:** no network access beyond the user-started Check for Updates, and no telemetry, recording, or new uses of the microphone. Audio is reduced to a level and discarded. See [PRIVACY.md](PRIVACY.md).
 - **Energy:** keep the tick timer only as fast as each mode needs, avoid redundant hardware reads and redraws, and use events or notifications instead of polling.
 - **Hardware safety:** keep hardware detection and the hand-back to macOS (switch off, quit, lock, sleep, lid close) working on every change to `Hardware/` or `Glow/`.
-- **Docs:** when you add, move, or rename a source file, update the layout in this file and the source map in `docs/HANDOFF.md`.
+- **Docs:** when you add, move, or rename a source file, update the layout in this file and the source map in `docs/ARCHITECTURE.md`.
 - **License header:** start each new source file with `// SPDX-License-Identifier: GPL-3.0-or-later` (or `# SPDX-License-Identifier: GPL-3.0-or-later` after the `#!` line of a script).
 - Don't change the version numbers or the bundle ID. The maintainer does that at release time.
 
