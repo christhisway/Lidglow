@@ -13,6 +13,10 @@ If Music remains on “Waiting for music” during playback, use **System Audio 
 
 Audio processing runs locally through a private Core Audio tap. The app reduces playback to a level driven by bass and drum hits and discards the samples. Hardware modes pause when the session locks, the display sleeps, or the lid closes. Older Macs can use the in-panel preview.
 
+## Privacy
+
+Lidglow uses no microphone, records nothing, and has no network code. Music mode reduces your Mac's audio output to a brightness level as it plays and then discards it. Settings are stored only in macOS preferences. Read the full [privacy statement](PRIVACY.md).
+
 ## Reporting bugs
 
 Lidglow has no network code, so it never sends crash reports or diagnostics anywhere. To report a problem, [open an issue](https://github.com/christhisway/Lidglow/issues/new/choose) and include what you can of the following:
