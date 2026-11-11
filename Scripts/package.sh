@@ -6,12 +6,16 @@
 set -eu
 cd -- "${0:A:h}/.."
 release="build/release"
+# Every release must carry the license.
+if [[ ! -f LICENSE ]]; then
+    print -u2 "package.sh: LICENSE is missing, so no release zip was made."
+    exit 1
+fi
 rm -rf -- "$release"
 mkdir -p "$release/stage"
 Scripts/build.sh "$release/stage/Lidglow.app"
-for file in LICENSE docs/PRIVACY.md; do
-    if [[ -f "$file" ]]; then cp "$file" "$release/stage/"; fi
-done
+cp LICENSE "$release/stage/"
+if [[ -f docs/PRIVACY.md ]]; then cp docs/PRIVACY.md "$release/stage/"; fi
 (cd "$release/stage" && ditto -c -k --sequesterRsrc --keepParent Lidglow.app ../Lidglow.zip)
 if [[ -n "$(ls "$release/stage" | grep -v '^Lidglow.app$')" ]]; then
     (cd "$release/stage" && zip -q ../Lidglow.zip $(ls | grep -v '^Lidglow.app$'))

@@ -113,6 +113,7 @@ Sources/Lidglow/
 Tests/BeatMeterTests/  Synthetic beat detector check
 Scripts/      build.sh, test.sh, package.sh (release zip and checksum), install.sh (the Terminal installer), and uninstall.sh
 docs/         Handoff notes, the end-user install guide, the release checklist, the changelog, and the contributing, security, and privacy notes
+.github/      Issue templates and the Release workflow, which builds a draft release from main when started by hand
 ```
 
 ## Build
@@ -125,7 +126,7 @@ To run the synthetic beat detector check:
 Scripts/test.sh
 ```
 
-`Scripts/package.sh` builds the release files that the installer downloads: `build/release/Lidglow.zip` and `Lidglow.zip.sha256`. See [docs/RELEASE.md](docs/RELEASE.md) for the release checklist.
+`Scripts/package.sh` builds the release files that the installer downloads: `build/release/Lidglow.zip` and `Lidglow.zip.sha256`. Published releases are built by the **Release** workflow in GitHub Actions instead, from `main`. See [docs/RELEASE.md](docs/RELEASE.md) for the release checklist.
 
 The default signature is ad hoc, which changes with every build, so macOS asks for System Audio Recording permission again after each update. To avoid that for free, sign releases with a self-signed certificate:
 
