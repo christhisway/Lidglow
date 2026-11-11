@@ -1,11 +1,10 @@
 import AppKit
 import SwiftUI
 
-/// Lays its subviews out from the top, so the panel's backdrop and content stay pinned under the menu
-/// bar while only their bottom edge moves.
+/// Holds the panel's SwiftUI content at the top, so the content stays put while the window's height
+/// changes from the bottom edge.
 private final class TopAnchoredView: NSView {
     override var isFlipped: Bool { true }
-    override var focusRingType: NSFocusRingType { get { .none } set {} }
 }
 
 final class LidglowApp: NSObject, NSApplicationDelegate {
@@ -13,10 +12,6 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     private let model = GlowModel()
     private var panel: MenuPanel?
     private var host: NSHostingController<GlowPanel>?
-    /// The glass panel itself. The window is transparent, and only this view animates when the panel's
-    /// height changes, because animating the window frame let the top of the panel visibly slide.
-    private var backdrop: NSView?
-    private var resizeGeneration = 0
     private var localMonitor: Any?
     private var outsideMonitor: Any?
     private var settingsWindow: SettingsWindow?
@@ -104,19 +99,13 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             }))
             host.sizingOptions = []
             // No scroll view: the panel always fits its content, and scrolling only ever revealed empty
-            // space. Both containers are flipped, so the content stays pinned to the top. None of them
-            // draws a focus ring, which outlined the whole panel when it opened.
-            host.view.focusRingType = .none
+            // space. The flipped container keeps the content pinned to the top while the window's
+            // bottom edge moves.
             let document = TopAnchoredView()
             document.addSubview(host.view)
-            let backdrop = MenuPanel.backdrop(containing: document)
-            backdrop.focusRingType = .none
-            let root = TopAnchoredView()
-            root.addSubview(backdrop)
             let container = NSViewController()
-            container.view = root
+            container.view = MenuPanel.backdrop(containing: document)
             container.addChild(host)
-            self.backdrop = backdrop
 
             let panel = MenuPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                                   backing: .buffered, defer: true)
@@ -134,8 +123,6 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         model.panelVisible = true
         guard positionPanel(), let panel else { model.panelVisible = false; return }
         panel.makeKeyAndOrderFront(nil)
-        // Start with nothing focused, so no focus ring appears until the user presses Tab.
-        panel.makeFirstResponder(nil)
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) {
             [weak self] event in
             guard let self else { return event }
@@ -169,12 +156,11 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     }
 
     /// Places the panel under the menu-bar icon, clamped to the visible screen, and sizes it to its
-    /// content. Pass `contentHeight` when SwiftUI has already measured it. With `animate`, only the glass
-    /// backdrop animates, over the same duration as the panel's SwiftUI animation. When growing, the
-    /// transparent window takes its final size first; when shrinking, it follows once the backdrop has.
+    /// content. Pass `contentHeight` when SwiftUI has already measured it. With `animate`, the frame
+    /// change follows the panel's own SwiftUI animation, keeping the top edge pinned under the icon.
     @discardableResult
     private func positionPanel(contentHeight: CGFloat? = nil, animate: Bool = false) -> Bool {
-        guard let panel, let host, let backdrop, let button = item?.button,
+        guard let panel, let host, let button = item?.button,
               let menuWindow = button.window, let screen = menuWindow.screen else { return false }
         let anchor = menuWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let visible = screen.visibleFrame.insetBy(dx: 6, dy: 6)
@@ -187,27 +173,16 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         let height = min(natural, top - visible.minY)
         let x = min(max(anchor.midX - width / 2, visible.minX), visible.maxX - width)
         let frame = NSRect(x: x, y: top - height, width: width, height: height)
-        let panelBounds = NSRect(x: 0, y: 0, width: width, height: height)
         host.view.frame = NSRect(x: 0, y: 0, width: width, height: natural)
-        resizeGeneration += 1
-        guard animate, panel.isVisible, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
-              backdrop.frame.height != height, backdrop.frame.width == width else {
+        guard animate, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+              panel.frame.height != height else {
             panel.setFrame(frame, display: true)
-            backdrop.frame = panelBounds
-            panel.invalidateShadow()
             return true
         }
-        let generation = resizeGeneration
-        let growing = height > backdrop.frame.height
-        if growing { panel.setFrame(frame, display: false) }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = GlowPanel.resizeDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            backdrop.animator().frame = panelBounds
-        } completionHandler: { [weak self] in
-            guard let self, generation == self.resizeGeneration else { return }
-            if !growing { panel.setFrame(frame, display: true) }
-            panel.invalidateShadow()
+            panel.animator().setFrame(frame, display: true)
         }
         return true
     }
