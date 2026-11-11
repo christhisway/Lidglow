@@ -1,13 +1,14 @@
 import AppKit
 
-/// Watches for other lid-logo utilities. They use the same private CoreBrightness controls, so if both
-/// apps drive the logo it flickers or ends up in a state neither restores. Lidglow backs off while
-/// one is running. This uses launch and quit notifications, never polling.
+/// Recognizes some other lid-logo apps by bundle ID, so Lidglow can step aside before the two fight and
+/// name the app in the panel. This is only a fast path: any other app that drives the logo is caught by
+/// `LidLogo`'s interference check instead. Uses launch and quit notifications, never polling.
 final class OtherLogoApps {
-    /// Bundle IDs of known logo utilities and the names shown in the panel.
+    /// Bundle IDs of logo apps known so far and the names shown in the panel. Add more as they turn up.
     static let known: [String: String] = [
         "co.supershort.backglow": "Backglow",
         "app.logolight.LogoLight": "LogoLight",
+        "app.lidlight.Lidlight": "Lidlight",
     ]
 
     /// The name of a running logo utility, or nil when none is running.
