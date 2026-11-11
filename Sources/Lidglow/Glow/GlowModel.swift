@@ -21,6 +21,17 @@ final class GlowModel: ObservableObject {
         didSet { UserDefaults.standard.set(sensitivity, forKey: "sensitivity") }
     }
 
+    @Published var breatheSpeed = UserDefaults.standard.string(forKey: "breatheSpeed")
+        .flatMap(BreatheSpeed.init(rawValue:)) ?? .normal {
+        didSet {
+            UserDefaults.standard.set(breatheSpeed.rawValue, forKey: "breatheSpeed")
+            // Keep the current point in the breath and continue from it at the new speed, so the glow
+            // doesn't jump.
+            let now = ProcessInfo.processInfo.systemUptime
+            phaseStart = now - (now - phaseStart) / oldValue.period * breatheSpeed.period
+        }
+    }
+
     @Published var idleGlow = UserDefaults.standard.bool(forKey: "idleGlow") {
         didSet { UserDefaults.standard.set(idleGlow, forKey: "idleGlow") }
     }
@@ -145,8 +156,8 @@ final class GlowModel: ObservableObject {
         onIconChange?(lit)
     }
 
-    // Music samples audio every tick, so it keeps the full rate while sound is playing. A 5 s breath
-    // doesn't need 60 Hz, and a settled, paused, or silent glow only needs to notice drift, lid
+    // Music samples audio every tick, so it keeps the full rate while sound is playing. Even a 3 s
+    // breath doesn't need 60 Hz, and a settled, paused, or silent glow only needs to notice drift, lid
     // closure, or a new target. During silence the audio callback wakes the loop on the first beat.
     private static let fastTick = 1 / 60.0
     private static let breatheTick = 1 / 30.0
@@ -235,7 +246,7 @@ final class GlowModel: ObservableObject {
         switch mode {
         case .standard: target = brightness; label = brightness > 0 ? "Standard glow" : "Lid logo off"
         case .breathe:
-            target = brightness * (0.15 + 0.85 * (1 - cos((now - phaseStart) * 2 * .pi / 5)) / 2)
+            target = brightness * (0.15 + 0.85 * (1 - cos((now - phaseStart) * 2 * .pi / breatheSpeed.period)) / 2)
             label = "Breathing"
         case .music:
             let signal = music.level(at: now)

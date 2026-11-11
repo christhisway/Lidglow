@@ -29,6 +29,9 @@ struct GlowPanel: View {
                 }
                 control("Brightness", icon: "sun.max", value: $model.brightness, range: 0...1,
                         reading: model.brightness > 0 ? "\(Int((model.brightness * 100).rounded()))%" : "Off")
+                if model.mode == .breathe {
+                    speedControl
+                }
                 if model.mode == .music {
                     control("Sensitivity", icon: "waveform", value: $model.sensitivity, range: 0.4...2.0,
                             reading: String(format: "%.1f×", model.sensitivity))
@@ -63,6 +66,24 @@ struct GlowPanel: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity)
+    }
+
+    private var speedControl: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Speed", systemImage: "gauge.with.dots.needle.50percent")
+                .font(.subheadline.weight(.medium))
+                .accessibilityHidden(true)
+            GlassSegments(items: BreatheSpeed.allCases, selection: model.breatheSpeed,
+                          select: { model.breatheSpeed = $0 }) { speed in
+                Text(speed.rawValue)
+                    .font(.caption.weight(.medium))
+                    .frame(maxWidth: .infinity, minHeight: 24)
+                    .accessibilityLabel("\(speed.rawValue) breathing speed")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func control(_ title: String, icon: String, value: Binding<Double>, range: ClosedRange<Double>,
