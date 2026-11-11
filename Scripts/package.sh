@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Builds a release zip for GitHub Releases. Usage: Scripts/package.sh
 # Writes build/release/Lidglow.zip and build/release/Lidglow.zip.sha256, the two files that
-# Scripts/install.sh downloads. Set LIDGLOW_SIGN_IDENTITY to sign with a stable identity (see README).
+# Scripts/install.sh downloads. Set LIDGLOW_SIGN_IDENTITY to sign with a stable identity (see docs/CONTRIBUTING.md).
 set -eu
 cd -- "${0:A:h}/.."
 release="build/release"

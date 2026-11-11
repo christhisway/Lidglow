@@ -1,6 +1,6 @@
 # Changelog
 
-Each release is also published on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with these notes. **Settings → About → Check for Updates** installs the latest stable release. See [Updating](../README.md#updating).
+Each release is also published on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with these notes. **Settings → About → Check for Updates** installs the latest stable release. See [Install](../README.md#install).
 
 ## Unreleased
 

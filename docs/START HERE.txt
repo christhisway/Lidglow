@@ -60,5 +60,5 @@ Lidglow is free software under the GNU General Public License, version 3 or
 later. See the LICENSE file included with it. It comes with no warranty, and
 it isn't made or endorsed by Apple.
 
-If you prefer to build locally, open README.md in the source folder. Give
+If you prefer to build locally, open docs/CONTRIBUTING.md in the source folder. Give
 docs/HANDOFF.md to your coding agent if you want to continue developing Lidglow.

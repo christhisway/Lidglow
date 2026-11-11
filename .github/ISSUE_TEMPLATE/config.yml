@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Troubleshooting
-    url: https://github.com/christhisway/Lidglow#use-lidglow
-    about: Check the README's setup steps, including the system audio permission, before filing a bug.
+    url: https://github.com/christhisway/Lidglow/blob/main/docs/CONTRIBUTING.md#reporting-bugs
+    about: Check the troubleshooting steps, including the system audio permission, before filing a bug.
