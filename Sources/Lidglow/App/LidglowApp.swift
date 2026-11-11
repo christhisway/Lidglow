@@ -15,6 +15,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     private var localMonitor: Any?
     private var outsideMonitor: Any?
     private var settingsWindow: SettingsWindow?
+    private var signalSources: [DispatchSourceSignal] = []
     private lazy var contextMenu: NSMenu = {
         let menu = NSMenu()
         let settings = NSMenuItem(title: "Open Settings…", action: #selector(openSettings), keyEquivalent: ",")
@@ -28,6 +29,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        handleTerminationSignals()
         let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item = status
         status.button?.target = self
@@ -87,7 +89,9 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             return
         }
         if panel == nil {
-            let host = NSHostingController(rootView: GlowPanel(model: model) { [weak self] height in
+            let host = NSHostingController(rootView: GlowPanel(model: model, openSettings: { [weak self] in
+                self?.openSettings()
+            }, onHeightChange: { [weak self] height in
                 // SwiftUI reports the new height in the same pass that adds or removes controls, so the
                 // window grows or shrinks with them rather than a run-loop pass later.
                 guard let self, self.panel?.isVisible == true else { return }
@@ -132,6 +136,11 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             guard let self else { return event }
             if event.type == .keyDown {
                 if event.keyCode == 53 { self.closePanel(); return nil }
+                let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                if modifiers == .command && event.charactersIgnoringModifiers == "," {
+                    self.openSettings()
+                    return nil
+                }
             } else if event.window !== self.panel && !self.clickIsOnStatusItem() {
                 self.closePanel()
             }
@@ -200,4 +209,17 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) { model.stop() }
+
+    /// `kill`, `pkill`, Ctrl-C in Terminal, and a closed Terminal window end the app without a normal
+    /// quit, which would leave the logo where Lidglow last put it. Route them through a normal quit so
+    /// the logo goes back to macOS. `kill -9` and crashes can't be caught. The next launch repairs those.
+    private func handleTerminationSignals() {
+        for number in [SIGTERM, SIGINT, SIGHUP] {
+            signal(number, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
+            source.setEventHandler { NSApp.terminate(nil) }
+            source.resume()
+            signalSources.append(source)
+        }
+    }
 }
