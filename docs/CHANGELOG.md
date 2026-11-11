@@ -1,6 +1,6 @@
 # Changelog
 
-Each release is also published on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with these notes. Lidglow doesn't check for updates itself. See [Updating](README.md#updating).
+Each release is also published on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with these notes. Lidglow doesn't check for updates itself. See [Updating](../README.md#updating).
 
 ## Unreleased
 

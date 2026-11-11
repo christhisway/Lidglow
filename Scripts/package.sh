@@ -15,7 +15,7 @@ rm -rf -- "$release"
 mkdir -p "$release/stage"
 Scripts/build.sh "$release/stage/Lidglow.app"
 cp LICENSE "$release/stage/"
-if [[ -f PRIVACY.md ]]; then cp PRIVACY.md "$release/stage/"; fi
+if [[ -f docs/PRIVACY.md ]]; then cp docs/PRIVACY.md "$release/stage/"; fi
 (cd "$release/stage" && ditto -c -k --sequesterRsrc --keepParent Lidglow.app ../Lidglow.zip)
 if [[ -n "$(ls "$release/stage" | grep -v '^Lidglow.app$')" ]]; then
     (cd "$release/stage" && zip -q ../Lidglow.zip $(ls | grep -v '^Lidglow.app$'))
