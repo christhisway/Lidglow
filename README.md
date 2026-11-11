@@ -6,28 +6,30 @@ Lidglow is a macOS menu-bar app that controls the illuminated Apple logo on MacB
 
 ## Requirements
 
-- macOS 27 or later on Apple silicon.
-- A MacBook Pro with PROLED XDR Display to control the logo. Other Apple silicon Macs get an on-screen preview only.
+- macOS 27 or later on Apple silicon. The app will not launch at all on Intel Macs.
+- A MacBook Pro with PROLED XDR Display to control the logo. No functionality will work on non-PROLED MacBooks.
 
-Logo control uses a private macOS interface, so a macOS update can stop it working. If that happens, Lidglow falls back to the preview.
+Logo control uses a private macOS interface, so a macOS update can stop it working. If that happens, Lidglow falls back to the preview. If you notice this, please submit an issue.
 
 ## Install
 
+Until 1.0 there's no stable release, so run the install command with the beta version from [GitHub Releases](https://github.com/christhisway/Lidglow/releases).
+
 Run this in Terminal:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash
-```
-
-Until 1.0 there's no stable release, so add the beta version you want from [GitHub Releases](https://github.com/christhisway/Lidglow/releases):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash -s -- v0.9.0-beta.1
 ```
 
+Upon stable release, this command installs the latest version:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash
+```
+
 The script verifies the download, installs `Lidglow.app` in `/Applications`, and opens it. Run it again to update, or use **Settings → About → Check for Updates** once stable releases exist.
 
-Lidglow isn't notarized by Apple. If you download `Lidglow.zip` in a browser instead, open the app once, then click **Open Anyway** in **System Settings → Privacy & Security**.
+Lidglow is not notarized by Apple. If you download `Lidglow.zip` in a browser instead, open the app once, close the security alert, then click **Open Anyway** in **System Settings → Privacy & Security**.
 
 ## Uninstall
 
@@ -37,12 +39,12 @@ Run this in Terminal:
 curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/uninstall.sh | bash
 ```
 
-It quits Lidglow so the logo goes back to macOS, then removes the app, its login item, and its settings. If you remove it by hand, quit Lidglow first, or the logo can stay stuck.
+It quits Lidglow so the logo goes back to macOS, then removes the app, its login item, and its settings. If you remove it by hand without the above command, quit Lidglow first, or the logo can stay stuck. In the event the logo gets stuck, it can be restored by closing and reopening the lid.
 
 ## Use
 
 1. Click the Lidglow icon in the menu bar and turn on the switch in the panel.
-2. Pick a mode: **Standard**, **Breathe**, or **Music**. For Music, allow system audio access when macOS asks.
+2. Pick a mode: **Standard**, **Breathe**, or **Music**. For Music, allow system audio access when macOS asks (see Privacy below).
 3. Click the gear for **Settings**. Turn the switch off to hand the logo back to macOS.
 
 Quit any other app that controls the lid logo first, so the two don't fight over it.
@@ -50,10 +52,11 @@ Quit any other app that controls the lid logo first, so the two don't fight over
 ## Features
 
 - **Standard** holds the logo at a brightness you choose.
-- **Breathe** fades it slowly up and down.
-- **Music** pulses with the beat from Spotify, Apple Music, any app, or the microphone.
+- **Breathe** fades it slowly up and down. Speed can be chosen from three presets.
+- **Music** pulses with the beat from a configured list of apps (default Spotify and Apple Music), all apps, or the microphone (requires Microphone access).
+  - Lidglow supports **automatic mode switching**, which turns on Music mode automatically when an allowed app is detected as playing audio, and immediately reverts back to the last selected mode when this audio stops (or after a set length of silence). This is off by default and can be enabled in Settings.
 - Hands the logo back to macOS when you lock, sleep, close the lid, or quit, and repairs it after a crash.
-- Optional automatic switch to Music when playback starts, and Open at Login.
+- Optional Open at Login, configurable in settings.
 
 ## Privacy
 
