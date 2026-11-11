@@ -4,13 +4,13 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 
 ## Current behavior
 
-- Lidglow starts in the menu bar and opens its controls only when the icon is clicked. The panel anchors below the status item, clamps to the active display’s visible frame, and expands down when Music controls appear. It scrolls when vertical space is limited. Control-clicking or right-clicking the icon opens a context menu with Open Settings… and Quit Lidglow. The Settings window has no sections yet.
-- A switch in the panel's top-right corner turns Lidglow on or off. Off returns control to macOS (1.0's System mode, which migrates to the switch being off) and is the first-launch default. Modes are Standard, Breathe, and Music. Standard holds a fixed brightness, and zero brightness turns the logo off (this replaced 1.0's separate Off and Steady modes, which migrate to Standard). The switch, selected mode, brightness, sensitivity, and idle glow settings persist.
-- Music uses a private Core Audio process tap to meter system playback, with separate bass and drum transient detection. It uses no microphone, stores no recordings, and has no network code.
+- Lidglow starts in the menu bar and opens its controls only when the icon is clicked. The panel anchors below the status item, clamps to the active display’s visible frame, and expands down when Music controls appear. It scrolls when vertical space is limited. Control-clicking or right-clicking the icon opens a context menu with Open Settings… and Quit Lidglow. A gear in the panel header, left of the switch, and ⌘, while the panel is focused also open Settings. The Settings window currently has an About section (version and project links). It closes with ⌘W.
+- A switch in the panel's top-right corner turns Lidglow on or off. Off returns control to macOS (1.0's System mode, which migrates to the switch being off) and is the first-launch default. Modes are Standard, Breathe, and Music. Standard holds a fixed brightness, and zero brightness turns the logo off (this replaced 1.0's separate Off and Steady modes, which migrate to Standard). Breathe has Slow (8 s), Normal (5 s, the default), and Fast (3 s) speeds. Changing speed keeps the current point in the breath. The switch, selected mode, brightness, Breathe speed, Focus preset, sensitivity, and idle glow settings persist.
+- Music uses a private Core Audio process tap to meter system playback, and detects transients per band. The Focus preset picks the bands. Bass (the default), Mids, and Treble each use one narrow band with 24 dB/octave Butterworth filters: 40–120 Hz, 300 Hz–3 kHz, and above 6 kHz. A hit counts only when that band carries at least 15% (fully at 50%) of the whole mix's onset energy, so leaks from other instruments don't flash the logo. Full is the original wide bass, drum, and treble detector. It uses no microphone, stores no recordings, and has no network code.
 - Idle glow sets a base between hits and tracks, capped at 90% of the chosen peak so beats can still brighten the logo. The preview and physical LED both glow white.
 - Each opening of the panel replays the laptop animation, then switches to a 2D logo that follows the live brightness. Reduce Motion goes directly to the 2D view.
 - While a known logo utility (Backglow `co.supershort.backglow`, LogoLight `app.logolight.LogoLight`) is running, Lidglow doesn't take control, shows which app has the logo, and takes over when it quits. If a settled logo is moved away from its target four times within 20 seconds by something else, Lidglow restores the logo and asks the user to quit the other app.
-- Music and logo control pause on session lock, sleep, or lid closure. Normal quit restores macOS control. Unsupported hardware uses the preview.
+- Music and logo control pause on session lock, sleep, or lid closure. Normal quit restores macOS control, and so do `SIGTERM`, `SIGINT`, and `SIGHUP` (`kill`, Ctrl-C, or closing Terminal), which go through a normal quit. While Lidglow holds the logo, macOS's original backlight mode is saved in `UserDefaults` (`logoHeldOriginalMode`) and cleared by every restore. If it's still set at launch, after a crash, a force quit, or `kill -9`, `LidLogo.recoverAfterUnexpectedExit()` runs the restore sequence before anything reads the logo's state. Unsupported hardware uses the preview.
 
 ## Source map
 
@@ -18,23 +18,23 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | --- | --- |
 | `App/Main.swift` | Entry point; starts the accessory (menu-bar) app |
 | `App/LidglowApp.swift` | Application delegate: status item and its context menu, panel window, positioning, event monitors, Settings window |
-| `Glow/GlowMode.swift` | The modes and their icons |
+| `Glow/GlowMode.swift` | The modes and their icons, and the Breathe speeds |
 | `Glow/GlowModel.swift` | Mode and settings state, tick loop, session lifecycle |
 | `UI/GlowPanel.swift` | SwiftUI glow controls |
 | `UI/GlassStyle.swift` | Shared Liquid Glass surfaces and the glass mode selector |
 | `UI/LaptopPreview.swift` | SceneKit intro and live logo close-up |
 | `UI/LaptopChassis.swift` | Laptop geometry and materials |
 | `UI/MenuPanel.swift` | Borderless key-capable panel |
-| `UI/SettingsWindow.swift` | The Settings window, built on open and released on close |
+| `UI/SettingsWindow.swift` | The Settings window and its About section, built on open and released on close |
 | `Audio/SystemMusic.swift` | Core Audio tap lifecycle |
-| `Audio/BeatMeter.swift` | Bass and drum transient detection |
-| `Hardware/LidLogo.swift` | Logo brightness transitions, original state tracking, and restoration |
+| `Audio/BeatMeter.swift` | Band transient detection and the Focus (EQ) presets |
+| `Hardware/LidLogo.swift` | Logo brightness transitions, original state tracking, restoration, and recovery after an unexpected exit |
 | `Hardware/OtherLogoApps.swift` | Watches launch and quit notifications for known logo utilities (Backglow, LogoLight) |
 | `Hardware/LaptopFinish.swift` | Automatic laptop finish detection |
 | `Hardware/LogoBridge.h`, `.m` | IOKit hardware detection and dynamically loaded CoreBrightness calls |
 | `Resources/Info.plist` | Version, bundle ID, menu-bar activation, deployment target, and audio permission text |
 
-Paths are relative to `Sources/Lidglow/`. Outside it, `Scripts/build.sh` builds and signs the app, `Scripts/test.sh` runs `Tests/BeatMeterTests/BeatMeterCheck.swift` (synthetic checks for kick and snare response, steady audio, and silence).
+Paths are relative to `Sources/Lidglow/`. Outside it, `Scripts/build.sh` builds and signs the app, `Scripts/test.sh` runs `Tests/BeatMeterTests/BeatMeterCheck.swift` (synthetic checks for kick, snare, hi-hat, and guitar-note response, steady audio, and silence, for every Focus preset).
 
 ## Build and verify
 

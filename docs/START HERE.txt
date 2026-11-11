@@ -17,6 +17,11 @@ Apple silicon and macOS 14.2 or later. Physical logo control requires a MacBook
 Pro with a PROLED XDR display and a controllable illuminated lid logo. Other
 Apple silicon Macs can use the on-screen preview.
 
+If the logo gets stuck
+If the lid logo stays dim, dark, or at one level after Lidglow crashed or was
+force quit, open Lidglow again. It repairs the logo when it starts. If the logo
+still looks wrong, quit Lidglow normally and restart your Mac.
+
 If macOS blocks the first launch
 This is an ad-hoc signed build without Apple notarization. If you trust the
 sender and macOS offers Open Anyway, find it in System Settings > Privacy &

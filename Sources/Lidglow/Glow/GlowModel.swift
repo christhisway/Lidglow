@@ -21,6 +21,25 @@ final class GlowModel: ObservableObject {
         didSet { UserDefaults.standard.set(sensitivity, forKey: "sensitivity") }
     }
 
+    @Published var eqPreset = UserDefaults.standard.string(forKey: "eqPreset")
+        .flatMap(EQPreset.init(saved:)) ?? .bass {
+        didSet {
+            UserDefaults.standard.set(eqPreset.rawValue, forKey: "eqPreset")
+            music.preset = eqPreset
+        }
+    }
+
+    @Published var breatheSpeed = UserDefaults.standard.string(forKey: "breatheSpeed")
+        .flatMap(BreatheSpeed.init(rawValue:)) ?? .normal {
+        didSet {
+            UserDefaults.standard.set(breatheSpeed.rawValue, forKey: "breatheSpeed")
+            // Keep the current point in the breath and continue from it at the new speed, so the glow
+            // doesn't jump.
+            let now = ProcessInfo.processInfo.systemUptime
+            phaseStart = now - (now - phaseStart) / oldValue.period * breatheSpeed.period
+        }
+    }
+
     @Published var idleGlow = UserDefaults.standard.bool(forKey: "idleGlow") {
         didSet { UserDefaults.standard.set(idleGlow, forKey: "idleGlow") }
     }
@@ -61,6 +80,7 @@ final class GlowModel: ObservableObject {
     }
 
     init() {
+        logo.recoverAfterUnexpectedExit()
         status = idleStatus
         let events: [(NSNotification.Name, Selector)] = [
             (NSWorkspace.screensDidSleepNotification, #selector(screenSleep)),
@@ -77,6 +97,7 @@ final class GlowModel: ObservableObject {
         distributed.addObserver(self, selector: #selector(lockSession), name: .init("com.apple.screenIsLocked"), object: nil)
         distributed.addObserver(self, selector: #selector(unlockSession), name: .init("com.apple.screenIsUnlocked"), object: nil)
         music.onSound = { [weak self] in self?.speedUp() }
+        music.preset = eqPreset
         otherApps.onChange = { [weak self] in self?.otherAppsChanged() }
     }
 
@@ -155,8 +176,8 @@ final class GlowModel: ObservableObject {
         onIconChange?(lit)
     }
 
-    // Music samples audio every tick, so it keeps the full rate while sound is playing. A 5 s breath
-    // doesn't need 60 Hz, and a settled, paused, or silent glow only needs to notice drift, lid
+    // Music samples audio every tick, so it keeps the full rate while sound is playing. Even a 3 s
+    // breath doesn't need 60 Hz, and a settled, paused, or silent glow only needs to notice drift, lid
     // closure, or a new target. During silence the audio callback wakes the loop on the first beat.
     private static let fastTick = 1 / 60.0
     private static let breatheTick = 1 / 30.0
@@ -253,7 +274,7 @@ final class GlowModel: ObservableObject {
         switch mode {
         case .standard: target = brightness; label = brightness > 0 ? "Standard glow" : "Lid logo off"
         case .breathe:
-            target = brightness * (0.15 + 0.85 * (1 - cos((now - phaseStart) * 2 * .pi / 5)) / 2)
+            target = brightness * (0.15 + 0.85 * (1 - cos((now - phaseStart) * 2 * .pi / breatheSpeed.period)) / 2)
             label = "Breathing"
         case .music:
             let signal = music.level(at: now)
@@ -265,11 +286,17 @@ final class GlowModel: ObservableObject {
                 ? "Reacting to system audio" : "Waiting for music · Play something on your Mac"
         }
         if hasHardware {
-            guard logo.takeControl(),
-                  logo.follow(target, now: now, rise: mode == .music ? 0.065 : 0.17,
-                              fall: mode == .music ? 0.15 : 0.22,
-                              tolerance: mode == .music && idleGlow && target == idleBrightness
-                                ? min(0.012, target / 2) : 0.045) else {
+            let following: Bool
+            if mode == .breathe {
+                following = logo.takeControl() && followBreath(now: now)
+            } else {
+                following = logo.takeControl()
+                    && logo.follow(target, now: now, rise: mode == .music ? 0.065 : 0.17,
+                                   fall: mode == .music ? 0.15 : 0.22,
+                                   tolerance: mode == .music && idleGlow && target == idleBrightness
+                                       ? min(0.012, target / 2) : 0.045)
+            }
+            guard following else {
                 stop()
                 publishLevel(0)
                 publishStatus("Couldn’t control the lid logo. Select a mode to retry.")
@@ -284,6 +311,20 @@ final class GlowModel: ObservableObject {
         }
         publishLevel(mode == .music && hasHardware ? logo.measuredLevel : target)
         publishStatus(hasHardware ? label : "Preview · " + label)
+    }
+
+    /// Chasing the moving breath target made the logo fade a little, hold, and fade again, because
+    /// each time it caught up it stopped until the target moved past the tolerance. That stepping was
+    /// worst at Slow. Instead, aim each ramp at the breath's next peak or trough and time it to arrive
+    /// there, so the hardware's own smooth fade carries a whole half-breath.
+    private func followBreath(now: Double) -> Bool {
+        let period = breatheSpeed.period
+        let phase = ((now - phaseStart) / period).truncatingRemainder(dividingBy: 1)
+        let rising = phase < 0.5
+        let extreme = rising ? brightness : brightness * 0.15
+        let remaining = max(0.05, ((rising ? 0.5 : 1) - phase) * period)
+        return logo.follow(extreme, now: now, rise: remaining, fall: remaining, tolerance: 0.03,
+                           maxDuration: period)
     }
 
     private func publishLevel(_ value: Double) {

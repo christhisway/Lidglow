@@ -20,6 +20,29 @@ final class LidLogo {
     private(set) var interferenceDetected = false
     var onRiseFromDark: (() -> Void)?
 
+    /// While Lidglow holds the logo, macOS's original backlight mode is saved here. A normal restore
+    /// clears it, so finding it at launch means the last run crashed, was force quit, or was killed.
+    private static let heldModeKey = "logoHeldOriginalMode"
+
+    /// Hands the logo back to macOS if the last run ended while holding it. Run this before anything
+    /// reads the logo's state, or a stuck state would be taken as macOS's original one.
+    @discardableResult
+    func recoverAfterUnexpectedExit() -> Bool {
+        let defaults = UserDefaults.standard
+        guard let saved = defaults.object(forKey: Self.heldModeKey) as? Int else { return false }
+        // Without the service the logo can't be repaired now, so keep the mark for the next launch.
+        guard bridge.mode >= 0 else { return false }
+        // The last fade direction is unknown, so reverse whichever way the logo could be held, then
+        // settle in the state macOS expects for the display and lid right now. Each fade resets
+        // `LEPWMFactorFadeDuration` to its default afterwards.
+        let displayAwake = awake && !bridge.lidClosed
+        _ = bridge.fade(towardLight: !displayAwake, duration: 3600, displayAwake: displayAwake)
+        _ = bridge.fade(towardLight: displayAwake, duration: 0, displayAwake: displayAwake)
+        if saved == 0 { _ = bridge.enableLogo(false) }
+        defaults.removeObject(forKey: Self.heldModeKey)
+        return true
+    }
+
     var available: Bool { bridge.mode >= 0 && bridge.level.isFinite }
     var awake: Bool {
         let screen = CGMainDisplayID()
@@ -37,7 +60,13 @@ final class LidLogo {
         guard originalMode == nil else { return true }
         let mode = bridge.mode
         guard mode >= 0, bridge.level.isFinite else { return false }
-        if mode == 0 && !bridge.enableLogo(true) { return false }
+        // Mark the logo as held before changing anything, so a crash from here on is repaired at the
+        // next launch.
+        UserDefaults.standard.set(mode, forKey: Self.heldModeKey)
+        if mode == 0 && !bridge.enableLogo(true) {
+            UserDefaults.standard.removeObject(forKey: Self.heldModeKey)
+            return false
+        }
         originalMode = mode
         interference = []
         interferenceDetected = false
@@ -65,9 +94,13 @@ final class LidLogo {
         if mode == 0 { _ = bridge.enableLogo(false) }
         direction = nil
         holding = false
+        UserDefaults.standard.removeObject(forKey: Self.heldModeKey)
     }
 
-    func follow(_ target: Double, now: Double, rise: Double, fall: Double, tolerance: Double = 0.045) -> Bool {
+    /// Moves the logo toward `target`, reaching it in about `rise` or `fall` seconds, then holds it there.
+    /// `maxDuration` caps a single ramp. Breathe raises it so one ramp can span a whole slow half-breath.
+    func follow(_ target: Double, now: Double, rise: Double, fall: Double, tolerance: Double = 0.045,
+                maxDuration: Double = 3) -> Bool {
         guard originalMode != nil else { return false }
         if target == settledTarget && now < nextSettledCheck { return true }
         let wasSettled = target == settledTarget
@@ -106,7 +139,7 @@ final class LidLogo {
             let x = 6.51 * midpoint
             if 1 - (1 + x) * exp(-x) < fraction { low = midpoint } else { high = midpoint }
         }
-        let duration = min(3, (rising ? rise : fall) / max(0.05, high))
+        let duration = min(maxDuration, (rising ? rise : fall) / max(0.05, high))
         if rising && level < 0.04 { onRiseFromDark?() }
         return command(rising, duration: duration, hold: false, now: now)
     }
