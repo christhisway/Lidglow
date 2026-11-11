@@ -96,7 +96,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
                 // window grows or shrinks with them rather than a run-loop pass later.
                 guard let self, self.panel?.isVisible == true else { return }
                 self.positionPanel(contentHeight: height, animate: true)
-            })
+            }))
             host.sizingOptions = []
             let document = TopAnchoredView()
             document.addSubview(host.view)
