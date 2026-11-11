@@ -13,7 +13,7 @@ trap 'rm -rf -- "$cache"' EXIT
 mkdir -p "$destination/Contents/MacOS"
 cp "$src/Resources/Info.plist" "$destination/Contents/Info.plist"
 sdk="$(xcrun --sdk macosx --show-sdk-path)"
-target="$(uname -m)-apple-macos14.2"
+target="$(uname -m)-apple-macos27.0"
 xcrun clang -target "$target" -isysroot "$sdk" -fobjc-arc -O2 \
     -c "$src/Hardware/LogoBridge.m" -o "$cache/LogoBridge.o"
 xcrun swiftc -target "$target" -sdk "$sdk" -module-cache-path "$module_cache" -O \

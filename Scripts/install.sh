@@ -15,7 +15,7 @@
 set -euo pipefail
 
 bundle_id="io.github.christhisway.lidglow"
-minimum_macos="14.2"
+minimum_macos="27.0"
 repo="christhisway/Lidglow"
 
 fail() { printf 'Lidglow install: %s\n' "$1" >&2; exit 1; }
