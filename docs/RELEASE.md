@@ -27,7 +27,7 @@ Run this in Terminal (it also updates an existing copy):
 
     curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash
 
-Requires Apple silicon and macOS 14.2 or later. Lidglow isn't notarized by Apple. The Terminal
+Requires Apple silicon and macOS 27 or later. Lidglow isn't notarized by Apple. The Terminal
 installer opens it without a warning. If you download Lidglow.zip in a browser, open it once, then
 click Open Anyway in System Settings → Privacy & Security.
 

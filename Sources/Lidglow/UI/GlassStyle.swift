@@ -2,9 +2,8 @@ import AppKit
 import SwiftUI
 
 /// Liquid Glass surfaces shared by the panel's controls, kept in one place so other surfaces
-/// (such as a mode-cycle HUD) can match them. macOS 26 draws the system glass; earlier systems use a
-/// material. Reduce Transparency swaps either for an opaque control fill, and Increase Contrast adds
-/// an outline. Both settings are read from the environment, so the surface follows them live.
+/// (such as a mode-cycle HUD) can match them. Reduce Transparency swaps the system glass for an opaque
+/// control fill, and Increase Contrast adds an outline. Both settings are read from the environment, so the surface follows them live.
 private struct GlassSurface<S: InsettableShape>: ViewModifier {
     let shape: S
     let interactive: Bool
@@ -19,15 +18,7 @@ private struct GlassSurface<S: InsettableShape>: ViewModifier {
         if reduceTransparency {
             content.background(Color(nsColor: .controlBackgroundColor), in: shape)
         } else {
-            #if compiler(>=6.2)
-            if #available(macOS 26, *) {
-                content.glassEffect(interactive ? Glass.regular.interactive() : .regular, in: shape)
-            } else {
-                content.background(.regularMaterial, in: shape)
-            }
-            #else
-            content.background(.regularMaterial, in: shape)
-            #endif
+            content.glassEffect(interactive ? Glass.regular.interactive() : .regular, in: shape)
         }
     }
 }
