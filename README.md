@@ -21,6 +21,10 @@ Lidglow never checks for updates itself, because it has no network code. New ver
 
 To update, quit Lidglow from the panel or its Control-click menu so it hands the logo back to macOS, then replace `Lidglow.app` with the new version and open it. Because this build is ad-hoc signed, macOS may ask for System Audio Recording permission again after an update.
 
+## Privacy
+
+Lidglow uses no microphone, records nothing, and has no network code. Music mode reduces your Mac's audio output to a brightness level as it plays and then discards it. Settings are stored only in macOS preferences. Read the full [privacy statement](PRIVACY.md).
+
 ## Reporting bugs
 
 Lidglow has no network code, so it never sends crash reports or diagnostics anywhere. To report a problem, [open an issue](https://github.com/christhisway/Lidglow/issues/new/choose) and include what you can of the following:
