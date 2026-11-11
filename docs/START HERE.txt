@@ -16,12 +16,18 @@ Or install from this archive:
    reacts. Turn on Idle glow to keep a base level and use Idle brightness to
    adjust it. Turn the switch off to return control to macOS.
 
-Quit other lid-light utilities before using Lidglow. This prebuilt app requires
+Quit other lid-light apps before using Lidglow. If another app changes the logo
+while Lidglow is using it, Lidglow steps aside and tells you in its panel. This prebuilt app requires
 Apple silicon and macOS 14.2 or later. Physical logo control requires a MacBook
 Pro with a PROLED XDR display and a controllable illuminated lid logo. Other
 Apple silicon Macs can use the on-screen preview.
 
 To open Lidglow when you log in, turn on Settings > General > Open at Login.
+
+If the logo gets stuck
+If the lid logo stays dim, dark, or at one level after Lidglow crashed or was
+force quit, open Lidglow again. It repairs the logo when it starts. If the logo
+still looks wrong, quit Lidglow normally and restart your Mac.
 
 If macOS blocks the first launch
 Lidglow isn't notarized by Apple. The Terminal installer avoids this warning.
