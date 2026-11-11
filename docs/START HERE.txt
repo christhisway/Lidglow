@@ -6,9 +6,10 @@ https://github.com/christhisway/Lidglow/issues
 Lidglow pulses the illuminated Apple logo to the music playing on your Mac.
 
 Install
-The easiest way is to run this in Terminal, which also works for updates:
+The easiest way is to run this in Terminal, which also works for updates. Betas are
+installed by version, so put the beta's version from the releases page at the end:
 
-  curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash -s -- v0.9.0-beta.1
 
 Or install from this archive:
 1. Unzip the archive. Drag Lidglow.app into Applications.

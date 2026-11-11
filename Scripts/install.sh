@@ -4,12 +4,18 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash
 #
+# With no argument, this installs the latest stable release. To install a specific version, such
+# as a beta, pass its tag after `bash -s --`:
+#
+#   curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash -s -- v0.9.0-beta.1
+#
 # Files downloaded with curl don't get macOS's quarantine attribute, so the app opens without a
 # Gatekeeper warning. The download is checked against the SHA-256 published with the release.
 # Running this again updates Lidglow. Nothing here needs sudo.
 #
 # Optional settings:
-#   LIDGLOW_VERSION      a release tag to install, for example v0.9.0-beta.1 (default: the latest release)
+#   LIDGLOW_VERSION      a release tag to install, the same as passing it as the argument (the
+#                        argument wins if both are given)
 #   LIDGLOW_INSTALL_DIR  where to put Lidglow.app (default: /Applications, or ~/Applications if that
 #                        isn't writable)
 #   LIDGLOW_RELEASE_URL  where to download Lidglow.zip and Lidglow.zip.sha256 from (for testing)
@@ -21,6 +27,18 @@ repo="christhisway/Lidglow"
 
 fail() { printf 'Lidglow install: %s\n' "$1" >&2; exit 1; }
 say() { printf '==> %s\n' "$1"; }
+
+releases_page="https://github.com/$repo/releases"
+install_command="curl -fsSL https://raw.githubusercontent.com/$repo/main/Scripts/install.sh | bash"
+
+# 0. Read the optional version. "0.9.0-beta.1" and "v0.9.0-beta.1" both mean the tag v0.9.0-beta.1.
+(( $# <= 1 )) || fail "Pass at most one version, for example: $install_command -s -- v0.9.0-beta.1"
+version="${1:-${LIDGLOW_VERSION:-}}"
+if [[ -n "$version" ]]; then
+    [[ "$version" == v* ]] || version="v$version"
+    [[ "$version" =~ ^v[0-9]+(\.[0-9]+)*(-[0-9A-Za-z.]+)?$ ]] \
+        || fail "\"$version\" isn't a Lidglow version. Versions look like v0.9.0-beta.1 or v1.0.0. See $releases_page"
+fi
 
 # 1. Check the Mac.
 [[ "$(uname -s)" == "Darwin" ]] || fail "Lidglow only runs on macOS."
@@ -35,15 +53,27 @@ fi
 # 2. Download the release and verify its checksum.
 if [[ -n "${LIDGLOW_RELEASE_URL:-}" ]]; then
     base="$LIDGLOW_RELEASE_URL"
-elif [[ -n "${LIDGLOW_VERSION:-}" ]]; then
-    base="https://github.com/$repo/releases/download/$LIDGLOW_VERSION"
+elif [[ -n "$version" ]]; then
+    base="https://github.com/$repo/releases/download/$version"
 else
+    # GitHub's "latest" release is the newest one that isn't a pre-release, so betas never count.
     base="https://github.com/$repo/releases/latest/download"
 fi
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
 say "Downloading Lidglow from $base"
-curl -fsSL "$base/Lidglow.zip" -o "$work/Lidglow.zip" || fail "Couldn't download Lidglow.zip."
+status=0
+curl -fsSL "$base/Lidglow.zip" -o "$work/Lidglow.zip" 2>/dev/null || status=$?
+if (( status == 22 )) && [[ -z "${LIDGLOW_RELEASE_URL:-}" ]]; then
+    # curl exits with 22 when GitHub answers with an error such as 404.
+    if [[ -n "$version" ]]; then
+        fail "There's no Lidglow release named $version. See the versions at $releases_page"
+    fi
+    fail "There's no stable Lidglow release yet. To install a beta, pass its version, for example:
+  $install_command -s -- v0.9.0-beta.1
+See the versions at $releases_page"
+fi
+(( status == 0 )) || fail "Couldn't download Lidglow.zip. Check your internet connection and try again."
 curl -fsSL "$base/Lidglow.zip.sha256" -o "$work/Lidglow.zip.sha256" || fail "Couldn't download the checksum."
 expected="$(awk '{ print $1; exit }' "$work/Lidglow.zip.sha256")"
 actual="$(shasum -a 256 "$work/Lidglow.zip" | awk '{ print $1 }')"
@@ -79,4 +109,8 @@ rm -rf -- "$app"
 ditto "$work/unpacked/Lidglow.app" "$app"
 say "Installed $app"
 open "$app"
-say "Lidglow is in your menu bar. Run this command again any time to update."
+if [[ -n "$version" ]]; then
+    say "Lidglow $version is in your menu bar. To update, run the install command again with the new version, or with no version for the latest stable release."
+else
+    say "Lidglow is in your menu bar. Run this command again any time to update."
+fi
