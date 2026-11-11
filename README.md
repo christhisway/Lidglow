@@ -113,7 +113,7 @@ Sources/Lidglow/
 Tests/BeatMeterTests/  Synthetic beat detector check
 Scripts/      build.sh, test.sh, package.sh (release zip and checksum), install.sh (the Terminal installer), and uninstall.sh
 docs/         Handoff notes, the end-user install guide, the release checklist, the changelog, and the contributing, security, and privacy notes
-.github/      Issue templates and the Release workflow, which builds and publishes a release from main when started by hand
+.github/      Issue templates and the Release workflow, which builds a draft release from main when started by hand
 ```
 
 ## Build

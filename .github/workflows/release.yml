@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Builds Lidglow from main and creates a GitHub Release with Lidglow.zip and Lidglow.zip.sha256.
+# Builds Lidglow from main and creates a draft GitHub Release with Lidglow.zip and Lidglow.zip.sha256.
 # It only runs when started by hand: Actions → Release → Run workflow. See docs/RELEASE.md.
+# The release is always a draft: only admins may create v* tags (the "Protect release tags" ruleset),
+# so the owner publishes it, which creates the tag. Betas are always marked as pre-releases.
 #
 # Needs two repository secrets holding the owner's "Lidglow Self-Signed" identity:
 #   LIDGLOW_SIGNING_P12           the certificate and private key exported as .p12, base64-encoded
@@ -14,14 +16,6 @@ on:
         description: "Tag to create, for example v0.9.0-beta.1 (must match the version in Info.plist)"
         required: true
         type: string
-      publish:
-        description: "Publish right away (otherwise it's a draft you check and publish yourself)"
-        type: boolean
-        default: false
-      prerelease:
-        description: "Mark as a GitHub pre-release (the installer's latest link skips pre-releases)"
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -51,7 +45,6 @@ jobs:
       - name: Check the tag against Info.plist
         env:
           TAG: ${{ inputs.tag }}
-          PUBLISH: ${{ inputs.publish }}
           GH_TOKEN: ${{ github.token }}
         run: |
           fail() { echo "::error::$1"; exit 1; }
@@ -67,10 +60,12 @@ jobs:
             [[ "$TAG" == "v$tag_version-beta."* && "${TAG##*-beta.}" =~ ^[1-9][0-9]*$ ]] \
               || fail "Info.plist says $version Beta, so the tag must look like v$tag_version-beta.1, not $TAG."
             display="$version Beta ${TAG##*-beta.}"
+            prerelease=true
           else
             [[ "$TAG" == "v$tag_version" ]] \
               || fail "Info.plist says $version, so the tag must be v$tag_version, not $TAG."
             display="$version"
+            prerelease=false
           fi
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
             fail "The tag $TAG already exists."
@@ -86,13 +81,12 @@ jobs:
             found { print }
           ' docs/CHANGELOG.md | sed -e '/./,$!d' > "$RUNNER_TEMP/whats-new.md"
           if [[ ! -s "$RUNNER_TEMP/whats-new.md" ]]; then
-            [[ "$PUBLISH" != "true" ]] \
-              || fail "docs/CHANGELOG.md has no \"## $display\" section. Move the Unreleased notes under it first."
             echo "::warning::docs/CHANGELOG.md has no \"## $display\" section, so the draft's What's new is a placeholder."
             echo "- …" > "$RUNNER_TEMP/whats-new.md"
           fi
           echo "Releasing Lidglow $display (build $build) from $GITHUB_SHA as $TAG"
           echo "DISPLAY_NAME=$display" >> "$GITHUB_ENV"
+          echo "PRERELEASE=$prerelease" >> "$GITHUB_ENV"
 
       - name: Import the signing identity
         env:
@@ -141,8 +135,6 @@ jobs:
       - name: Create the release
         env:
           TAG: ${{ inputs.tag }}
-          PUBLISH: ${{ inputs.publish }}
-          PRERELEASE: ${{ inputs.prerelease }}
           GH_TOKEN: ${{ github.token }}
         run: |
           checksum="$(awk '{ print $1; exit }' build/release/Lidglow.zip.sha256)"
@@ -152,7 +144,7 @@ jobs:
             echo
             echo "Run this in Terminal (it also updates an existing copy):"
             echo
-            echo "    curl -fsSL https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/Scripts/install.sh | bash"
+            echo "    curl -fsSL https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/Scripts/install.sh | bash -s -- $TAG"
             echo
             echo "Requires Apple silicon and macOS 27 or later. Lidglow isn't notarized by Apple. The Terminal"
             echo "installer opens it without a warning. If you download Lidglow.zip in a browser, open it once, then"
@@ -168,9 +160,9 @@ jobs:
             echo
             echo "Built from [\`${GITHUB_SHA:0:7}\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA) by the Release workflow ([run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)) with \`LIDGLOW_SIGN_IDENTITY=\"$SIGN_IDENTITY\" Scripts/package.sh\`."
           } > "$notes"
-          flags=()
-          [[ "$PUBLISH" == "true" ]] || flags+=(--draft)
-          [[ "$PRERELEASE" == "true" ]] && flags+=(--prerelease)
+          # Always a draft: the tag ruleset only lets admins create v* tags, so publishing is the owner's step.
+          flags=(--draft)
+          if [[ "$PRERELEASE" == "true" ]]; then flags+=(--prerelease); fi
           gh release create "$TAG" build/release/Lidglow.zip build/release/Lidglow.zip.sha256 \
             --target "$GITHUB_SHA" --title "Lidglow $DISPLAY_NAME" --notes-file "$notes" "${flags[@]}"
           cat "$notes" >> "$GITHUB_STEP_SUMMARY"
