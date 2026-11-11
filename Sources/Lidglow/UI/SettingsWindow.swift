@@ -321,7 +321,7 @@ private struct AboutSection: View {
                 Link("View License", destination: ProjectLinks.license)
             } label: {
                 Text("License")
-                Text("Free software under the GNU GPL v3 or later, with no warranty. Not affiliated with Apple.")
+                Text("Free software under the GNU GPL v3 or later, with no warranty. Not affiliated with Apple. Created by Jayden Webb and Kunal Singh.")
             }
         }
     }
