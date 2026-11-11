@@ -29,6 +29,21 @@ If the lid logo stays dim, dark, or at one level after Lidglow crashed or was
 force quit, open Lidglow again. It repairs the logo when it starts. If the logo
 still looks wrong, quit Lidglow normally and restart your Mac.
 
+Uninstall
+Quit Lidglow first (Quit in its panel), so it hands the logo back to macOS.
+Then either run this in Terminal:
+
+  curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/uninstall.sh | bash
+
+or delete Lidglow.app from Applications. Optional cleanup:
+- Settings: run  defaults delete io.github.christhisway.lidglow
+- Audio permission: System Settings > Privacy & Security > Screen & System
+  Audio Recording
+- Microphone permission (if you used it): System Settings > Privacy &
+  Security > Microphone
+- Login item: System Settings > General > Login Items
+If the logo still looks wrong afterwards, restart your Mac.
+
 If macOS blocks the first launch
 Lidglow isn't notarized by Apple. The Terminal installer avoids this warning.
 If you installed from a browser download, try to open the app once, then go to

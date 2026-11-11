@@ -16,7 +16,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 
 | File | Role |
 | --- | --- |
-| `App/Main.swift` | Entry point; starts the accessory (menu-bar) app |
+| `App/Main.swift` | Entry point; starts the accessory (menu-bar) app, or only unregisters the login item for the uninstaller |
 | `App/Log.swift` | `Logger` categories for local diagnostics (hardware and audio, no audio data) |
 | `App/LidglowApp.swift` | Application delegate: status item and its context menu, panel window, positioning, event monitors, Settings window |
 | `Glow/GlowMode.swift` | The modes and their icons, and the Breathe speeds |
@@ -36,7 +36,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `Resources/Info.plist` | Version, bundle ID, menu-bar activation, deployment target, and audio and microphone permission text |
 | `Resources/Lidglow.entitlements` | Microphone (audio input) entitlement, applied when `build.sh` signs with a Developer ID identity and the hardened runtime |
 
-Paths are relative to `Sources/Lidglow/`. Outside it, `Scripts/build.sh` builds and signs the app, `Scripts/package.sh` makes the release zip and its SHA-256, `Scripts/install.sh` is the Terminal installer and updater, `docs/RELEASE.md` is the release checklist, and `Scripts/test.sh` runs `Tests/BeatMeterTests/BeatMeterCheck.swift` (synthetic checks for kick, snare, hi-hat, and guitar-note response, steady audio, and silence, for every Focus preset).
+Paths are relative to `Sources/Lidglow/`. Outside it, `Scripts/build.sh` builds and signs the app, `Scripts/package.sh` makes the release zip and its SHA-256, `Scripts/install.sh` is the Terminal installer and updater, `Scripts/uninstall.sh` removes the app, its login item, and its settings (it runs `Lidglow --unregister-login-item`, handled in `App/Main.swift`), `docs/RELEASE.md` is the release checklist, and `Scripts/test.sh` runs `Tests/BeatMeterTests/BeatMeterCheck.swift` (synthetic checks for kick, snare, hi-hat, and guitar-note response, steady audio, and silence, for every Focus preset).
 
 ## Build and verify
 

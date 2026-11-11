@@ -24,6 +24,27 @@ To start Lidglow automatically, turn on **Settings → General → Open at Login
 
 **Lidglow isn't notarized by Apple.** It's a free personal project, so it doesn't pay for an Apple Developer ID. Installing with the command above opens the app normally, because files downloaded with `curl` aren't marked as quarantined. If you download `Lidglow.zip` in a browser instead, macOS blocks the first launch: open the app once, then go to **System Settings → Privacy & Security** and click **Open Anyway**. (Since macOS 15, Control-click → Open no longer bypasses this.) Either way, you're trusting this project directly. Each release lists its checksum and the source it was built from.
 
+## Uninstall
+
+Run this in Terminal:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/uninstall.sh | bash
+```
+
+It quits Lidglow normally so the logo goes back to macOS, removes its login item, deletes `Lidglow.app` and its settings. To also reset the System Audio Recording and Microphone permissions, add `-s -- --reset-permission` after `bash`.
+
+To uninstall by hand:
+
+1. **Quit Lidglow first** with **Quit** in the panel or its Control-click menu, so it hands the logo back to macOS. Deleting the app while it's running can leave the logo stuck.
+2. If **Open at Login** is on, turn it off in **Settings → General**, or remove Lidglow in **System Settings → General → Login Items**.
+3. Delete `Lidglow.app` from `/Applications` (or wherever you put it).
+4. Optional cleanup:
+   - Remove its settings: `defaults delete io.github.christhisway.lidglow`
+   - Remove its audio permission in **System Settings → Privacy & Security → Screen & System Audio Recording**, or with `tccutil reset AudioCapture io.github.christhisway.lidglow` (before deleting the app).
+   - If you used **Microphone**, remove that permission in **System Settings → Privacy & Security → Microphone**, or with `tccutil reset Microphone io.github.christhisway.lidglow` (before deleting the app).
+5. If the logo still looks wrong afterwards, restart your Mac.
+
 ## Use Lidglow
 
 1. Quit any other app that controls the lid logo, so that only one app sends brightness commands. Lidglow also watches for this itself. If another app changes the logo while Lidglow holds it, Lidglow hands the logo back to macOS and asks you to quit that app. A few logo apps are recognized by name: while one of them is running, Lidglow leaves the logo alone, says so in its panel, and takes over when it quits.
@@ -71,7 +92,7 @@ Sources/Lidglow/
   Hardware/   Lid logo control, detection of other apps controlling the logo, laptop finish detection, and the Objective-C CoreBrightness bridge
   Resources/  Info.plist and the entitlements used for Developer ID (hardened-runtime) signing
 Tests/BeatMeterTests/  Synthetic beat detector check
-Scripts/      build.sh, test.sh, package.sh (release zip and checksum), and install.sh (the Terminal installer)
+Scripts/      build.sh, test.sh, package.sh (release zip and checksum), install.sh (the Terminal installer), and uninstall.sh
 docs/         Handoff notes, the end-user install guide, and the release checklist
 ```
 
