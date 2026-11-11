@@ -29,9 +29,9 @@ enum CodingAgent: String, CaseIterable, Identifiable {
     var instructions: String {
         switch self {
         case .claudeCode:
-            "Add these hooks to \(configPath). If the file already has a \"hooks\" object, merge these events into it. Claude Code picks up the change in new sessions."
+            "Add these hooks to \(configPath), merging them into any already there. They apply to new sessions."
         case .codex:
-            "Add these hooks to \(configPath), merging them into any hooks already there. Then run /hooks in Codex to review and trust them. Codex runs hooks only after you trust them."
+            "Add these hooks to \(configPath), merging them into any already there, then run /hooks in Codex to trust them."
         }
     }
 
