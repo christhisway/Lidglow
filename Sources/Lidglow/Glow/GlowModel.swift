@@ -12,6 +12,8 @@ final class GlowModel: ObservableObject {
     @Published private(set) var level = 0.0
     @Published private(set) var status = "Checking lid hardware…"
     @Published private(set) var audioError = false
+    /// The logo is there but Lidglow couldn't control it. The panel shows a Report a bug link with it.
+    @Published private(set) var controlFailed = false
     /// Each mode keeps its own brightness, so turning Standard off doesn't leave Breathe or Music (or an
     /// automatic switch to Music) dark. Saved per mode.
     @Published private var brightnessByMode = Dictionary(uniqueKeysWithValues: GlowMode.allCases.map {
@@ -202,8 +204,7 @@ final class GlowModel: ObservableObject {
 
     init() {
         logo.recoverAfterUnexpectedExit()
-        status = idleStatus
-        Logger.hardware.notice("Hardware check: \(self.idleStatus, privacy: .public)")
+        Logger.hardware.notice("Hardware check: \(String(describing: self.logo.support), privacy: .public)")
         let events: [(NSNotification.Name, Selector)] = [
             (NSWorkspace.screensDidSleepNotification, #selector(screenSleep)),
             (NSWorkspace.screensDidWakeNotification, #selector(screenWake)),
@@ -232,14 +233,11 @@ final class GlowModel: ObservableObject {
         playback.onChange = { [weak self] playing in self?.playbackChanged(playing) }
     }
 
-    /// The logo can be controlled: the hardware is there and the private CoreBrightness interface looks
-    /// as expected. Otherwise everything runs as a preview and nothing is sent to the logo.
-    var hasHardware: Bool { logo.bridge.hardwarePresent && logo.bridge.serviceAvailable }
-    private var idleStatus: String {
-        if !logo.bridge.hardwarePresent { return "Preview only · No controllable lid logo found" }
-        if !logo.bridge.serviceAvailable { return "Preview only · Lid logo service unavailable" }
-        return logo.available ? "macOS is managing the lid logo" : "Lid logo service unavailable"
-    }
+    /// `LidglowApp` only creates the model on a Mac with a light-up logo. If CoreBrightness can't
+    /// control it, nothing runs and the panel shows one of these with a Report a bug link.
+    private static let controlError = "Couldn’t control the lid logo. Select a mode to retry."
+    private static let serviceError = "Couldn’t reach the lid logo service. Turn on Lidglow to retry."
+    private static let bugReportURL = URL(string: "https://github.com/christhisway/Lidglow/issues/new?template=bug_report.yml")!
 
     private static let modeKey = "glowMode"
     /// The mode selected before Music, which the silence timeout returns to. Saved so it survives a relaunch.
@@ -321,15 +319,25 @@ final class GlowModel: ObservableObject {
         audioError = false
         phaseStart = ProcessInfo.processInfo.systemUptime
         hardwareCheck = 0
-        guard enabled else {
+        controlFailed = false
+        let support = logo.support
+        guard enabled, support == .supported else {
             level = 0
             latestLevel = 0
-            status = idleStatus
+            // With the switch on, the first tick's `takeControl()` finds a logo whose state can't be read.
+            // With it off nothing else reads the logo, so check here.
+            if support == .supported && logo.available {
+                status = "macOS is managing the lid logo"
+            } else {
+                Logger.hardware.error("The lid logo service is unavailable")
+                controlFailed = true
+                status = enabled ? Self.controlError : Self.serviceError
+            }
             return
         }
         // Another logo utility is running. Leave the logo alone until it quits, which `otherAppsChanged`
         // hears about, so no timer is needed in the meantime.
-        if hasHardware, let other = otherApps.running {
+        if let other = otherApps.running {
             level = 0
             latestLevel = 0
             status = "\(other) is controlling the lid logo. Quit it to use Lidglow."
@@ -375,14 +383,14 @@ final class GlowModel: ObservableObject {
             case .music:
                 let now = ProcessInfo.processInfo.systemUptime
                 let silent = lastSignal.map { now - $0 >= Self.silenceDelay } ?? true
-                if silent && (!hasHardware || logo.isSettled) {
+                if silent && logo.isSettled {
                     music.armWake()
                     interval = Self.idleTick
                 } else {
                     interval = Self.fastTick
                 }
             case .breathe: interval = Self.breatheTick
-            case .standard: interval = !hasHardware || logo.isSettled ? Self.idleTick : Self.fastTick
+            case .standard: interval = logo.isSettled ? Self.idleTick : Self.fastTick
             }
         }
         if abs(timer.timeInterval - interval) > 1e-6 { schedule(interval) }
@@ -394,7 +402,7 @@ final class GlowModel: ObservableObject {
     }
 
     private func otherAppsChanged() {
-        guard enabled, hasHardware else { return }
+        guard enabled else { return }
         // `stop()` hands the logo back to macOS through the normal restore path before anything else
         // touches it.
         stop()
@@ -432,7 +440,7 @@ final class GlowModel: ObservableObject {
         defer { scheduleNextTick() }
         let now = ProcessInfo.processInfo.systemUptime
         if now >= hardwareCheck {
-            mayRun = !hasHardware || (logo.awake && !logo.bridge.lidClosed)
+            mayRun = logo.awake && !logo.bridge.lidClosed
             hardwareCheck = now + 0.35
         }
         guard displaysAwake && sessionActive && mayRun else {
@@ -488,32 +496,31 @@ final class GlowModel: ObservableObject {
                 label = "Waiting for music · Play something on your Mac"
             }
         }
-        if hasHardware {
-            let following: Bool
-            if mode == .breathe {
-                following = logo.takeControl() && followBreath(now: now)
-            } else {
-                following = logo.takeControl()
-                    && logo.follow(target, now: now, rise: mode == .music ? 0.065 : 0.17,
-                                   fall: mode == .music ? 0.15 : 0.22,
-                                   tolerance: mode == .music && idleGlow && target == idleBrightness
-                                       ? min(0.012, target / 2) : 0.045)
-            }
-            guard following else {
-                stop()
-                publishLevel(0)
-                publishStatus("Couldn’t control the lid logo. Select a mode to retry.")
-                return
-            }
-            if logo.interferenceDetected {
-                stop()
-                publishLevel(0)
-                publishStatus("Another app is changing the lid logo. Quit it, then select a mode to retry.")
-                return
-            }
+        let following: Bool
+        if mode == .breathe {
+            following = logo.takeControl() && followBreath(now: now)
+        } else {
+            following = logo.takeControl()
+                && logo.follow(target, now: now, rise: mode == .music ? 0.065 : 0.17,
+                               fall: mode == .music ? 0.15 : 0.22,
+                               tolerance: mode == .music && idleGlow && target == idleBrightness
+                                   ? min(0.012, target / 2) : 0.045)
         }
-        publishLevel(mode == .music && hasHardware ? logo.measuredLevel : target)
-        publishStatus(hasHardware ? label : "Preview · " + label)
+        guard following else {
+            stop()
+            publishLevel(0)
+            controlFailed = true
+            publishStatus(Self.controlError)
+            return
+        }
+        if logo.interferenceDetected {
+            stop()
+            publishLevel(0)
+            publishStatus("Another app is changing the lid logo. Quit it, then select a mode to retry.")
+            return
+        }
+        publishLevel(mode == .music ? logo.measuredLevel : target)
+        publishStatus(label)
     }
 
     /// Chasing the moving breath target made the logo fade a little, hold, and fade again, because
@@ -539,6 +546,12 @@ final class GlowModel: ObservableObject {
 
     private func publishStatus(_ value: String) {
         if status != value { status = value }
+    }
+
+    /// Opens the bug report form in the default browser. Lidglow itself makes no network request, and
+    /// the URL carries nothing about the user or their Mac.
+    func reportBug() {
+        NSWorkspace.shared.open(Self.bugReportURL)
     }
 
     /// Opens the privacy pane for the current source: Microphone, or Screen & System Audio Recording.

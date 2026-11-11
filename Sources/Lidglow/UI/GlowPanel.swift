@@ -89,6 +89,12 @@ struct GlowPanel: View {
                 Spacer(minLength: 12)
                 Button("Quit") { NSApp.terminate(nil) }.controlSize(.small)
             }
+            if model.controlFailed {
+                Button("Report a bug", action: model.reportBug)
+                    .buttonStyle(.link).font(.subheadline)
+                    .help("Opens the bug report form on GitHub in your browser")
+                    .transition(reveal)
+            }
             if model.mode == .music {
                 Button(model.musicSource == .microphone ? "Microphone Settings…" : "System Audio Settings…") {
                     model.openAudioSettings()
@@ -100,6 +106,7 @@ struct GlowPanel: View {
         // The window animates to the new height over the same duration (see `LidglowApp.positionPanel`).
         .animation(resize, value: model.mode)
         .animation(resize, value: model.idleGlow)
+        .animation(resize, value: model.controlFailed)
         .padding(18)
         .frame(maxWidth: .infinity)
     }

@@ -22,8 +22,8 @@ Or install from this archive:
 Quit other lid-light apps before using Lidglow. If another app changes the logo
 while Lidglow is using it, Lidglow steps aside and tells you in its panel. This prebuilt app requires
 Apple silicon and macOS 27 or later. Physical logo control requires a MacBook
-Pro with a PROLED XDR display and a controllable illuminated lid logo. Other
-Apple silicon Macs can use the on-screen preview.
+Pro with a PROLED XDR display and a controllable illuminated lid logo. On other
+Apple silicon Macs, Lidglow only says the Mac isn't supported and offers Quit.
 
 To open Lidglow when you log in, turn on Settings > General > Open at Login.
 

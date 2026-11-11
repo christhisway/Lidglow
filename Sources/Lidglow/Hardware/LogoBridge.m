@@ -16,15 +16,19 @@
     NSObject<BrightnessService> *_client;
     NSArray<NSNumber *> *_keyboards;
 }
++ (BOOL)logoHardwarePresent {
+    io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceNameMatching("bklb-backlight"));
+    if (!service) return NO;
+    IOObjectRelease(service);
+    return YES;
+}
 // CoreBrightness is private and can change with any macOS update. Every call checks the types it gets
-// back and catches Objective-C exceptions, so a changed interface leads to "unavailable" and preview
-// mode, never a crash.
+// back and catches Objective-C exceptions, so a changed interface leads to "unavailable" and an error
+// in the panel, never a crash.
 - (instancetype)init {
     self = [super init];
     if (!self) return nil;
-    io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceNameMatching("bklb-backlight"));
-    if (!service) return self;
-    IOObjectRelease(service);
+    if (!LogoBridge.logoHardwarePresent) return self;
     _hardwarePresent = YES;
 
     @try {
