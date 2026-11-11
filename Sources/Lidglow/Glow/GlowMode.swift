@@ -28,3 +28,29 @@ enum BreatheSpeed: String, CaseIterable {
         }
     }
 }
+
+/// How long Music waits through silence before switching back to the mode used before it.
+enum MusicTimeout: Int, CaseIterable, Identifiable {
+    case fiveSeconds = 5
+    case tenSeconds = 10
+    case fifteenSeconds = 15
+    case thirtySeconds = 30
+    case oneMinute = 60
+    case never = 0
+
+    var id: Int { rawValue }
+
+    /// Seconds of silence before switching back, or nil for never.
+    var seconds: Double? { self == .never ? nil : Double(rawValue) }
+
+    var title: String {
+        switch self {
+        case .fiveSeconds: "5 seconds"
+        case .tenSeconds: "10 seconds"
+        case .fifteenSeconds: "15 seconds"
+        case .thirtySeconds: "30 seconds"
+        case .oneMinute: "1 minute"
+        case .never: "Never"
+        }
+    }
+}

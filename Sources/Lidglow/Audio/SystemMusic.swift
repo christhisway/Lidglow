@@ -54,7 +54,7 @@ final class SystemMusic {
     var waitingForApps: Bool { started && bundleIDs != nil && callback == nil }
     private var tappedProcesses: [AudioObjectID]?
     private var processListener: AudioObjectPropertyListenerBlock?
-    static var processListAddress = AudioObjectPropertyAddress(
+    private static var processListAddress = AudioObjectPropertyAddress(
         mSelector: kAudioHardwarePropertyProcessObjectList,
         mScope: kAudioObjectPropertyScopeGlobal,
         mElement: kAudioObjectPropertyElementMain)
@@ -112,7 +112,7 @@ final class SystemMusic {
     }
 
     private func processesChanged() {
-        guard started, let bundleIDs, Self.processes(matching: bundleIDs) != tappedProcesses else { return }
+        guard started, let bundleIDs, matchingProcesses(bundleIDs) != tappedProcesses else { return }
         rebuild()
     }
 
@@ -126,9 +126,8 @@ final class SystemMusic {
     }
 
     /// Core Audio's process objects for the selected apps, including their helpers (for example
-    /// `com.google.Chrome.helper`), in a stable order. `PlaybackWatcher` uses the same matching.
-    static func processes(matching bundleIDs: Set<String>) -> [AudioObjectID] {
-        guard !bundleIDs.isEmpty else { return [] }
+    /// `com.google.Chrome.helper`), in a stable order.
+    private func matchingProcesses(_ bundleIDs: Set<String>) -> [AudioObjectID] {
         let system = AudioObjectID(kAudioObjectSystemObject)
         var size: UInt32 = 0
         guard AudioObjectGetPropertyDataSize(system, &Self.processListAddress, 0, nil, &size) == noErr, size > 0 else {
@@ -156,7 +155,7 @@ final class SystemMusic {
             try buildMicrophone()
             return
         }
-        let processes = bundleIDs.map(Self.processes(matching:))
+        let processes = bundleIDs.map(matchingProcesses)
         tappedProcesses = processes
         // None of the selected apps has audio open. Stay down until the process list changes.
         if processes?.isEmpty == true { return }
