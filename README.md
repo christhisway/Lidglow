@@ -6,12 +6,12 @@ Lidglow is a native macOS menu-bar app for the illuminated Apple logo on MacBook
 
 1. Quit Backglow or any other utility controlling the lid logo so that only one app sends brightness commands.
 2. Open **Lidglow.app** in Finder. Click the waveform circle in the macOS menu bar to open its controls, and turn on the switch in the panel's top-right corner. Click the gear next to the switch (or press ⌘, while the panel is open) for **Settings**, which shows the version and project links. Control-click or right-click the icon for **Open Settings…** and **Quit Lidglow**.
-3. Choose **Music**, allow macOS system audio capture when prompted, and play music. **Brightness** sets the peak glow and **Sensitivity** adjusts how strongly bass and drum hits drive it. Turn on **Idle glow** to keep a base between beats and tracks. Use **Idle brightness** to raise or lower it.
+3. Choose **Music**, allow macOS system audio capture when prompted, and play music. **Brightness** sets the peak glow and **Sensitivity** adjusts how strongly hits drive it. **Focus** picks what drives the glow: **Bass** (kick drums and bass lines, the default), **Mids** (vocals, guitars, keys, and snares), **Treble** (hi-hats and cymbals), or **Full** (the whole mix). Turn on **Idle glow** to keep a base between beats and tracks. Use **Idle brightness** to raise or lower it.
 4. Turn the switch off to hand brightness back to macOS. **Standard** holds the logo at the chosen brightness (drag **Brightness** all the way down to turn it off), and **Breathe** fades it up and down. Choose a **Speed** of Slow, Normal, or Fast under Brightness.
 
 If Music remains on “Waiting for music” during playback, use **System Audio Settings…** to check Lidglow’s access under **Privacy & Security → Screen & System Audio Recording**. After changing access, reselect **Music** or quit and reopen Lidglow.
 
-Audio processing runs locally through a private Core Audio tap. The app reduces playback to a level driven by bass and drum hits and discards the samples. Hardware modes pause when the session locks, the display sleeps, or the lid closes. Older Macs can use the in-panel preview.
+Audio processing runs locally through a private Core Audio tap. The app reduces playback to a level driven by hits in the chosen Focus and discards the samples. Hardware modes pause when the session locks, the display sleeps, or the lid closes. Older Macs can use the in-panel preview.
 
 ## Updating
 
