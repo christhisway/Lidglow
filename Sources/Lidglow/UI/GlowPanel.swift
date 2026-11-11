@@ -61,7 +61,7 @@ struct GlowPanel: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 46)
                 }
-                control("Brightness", icon: "sun.max", value: $model.brightness, range: 0...1,
+                control("Brightness", icon: "sun.max", value: $model.brightness, range: model.brightnessRange,
                         reading: model.brightness > 0 ? "\(Int((model.brightness * 100).rounded()))%" : "Off")
                 if model.mode == .breathe {
                     choice("Speed", icon: "gauge.with.dots.needle.50percent", items: BreatheSpeed.allCases,
