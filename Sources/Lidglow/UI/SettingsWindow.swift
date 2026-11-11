@@ -7,14 +7,14 @@ import SwiftUI
 final class SettingsWindow: NSWindow, NSWindowDelegate {
     private let onClose: () -> Void
 
-    init(onClose: @escaping () -> Void) {
+    init(model: GlowModel, onClose: @escaping () -> Void) {
         self.onClose = onClose
-        super.init(contentRect: NSRect(x: 0, y: 0, width: 500, height: 360),
+        super.init(contentRect: NSRect(x: 0, y: 0, width: 500, height: 480),
                    styleMask: [.titled, .closable, .miniaturizable],
                    backing: .buffered, defer: true)
         title = "Lidglow Settings"
         isReleasedWhenClosed = false
-        contentViewController = NSHostingController(rootView: SettingsView())
+        contentViewController = NSHostingController(rootView: SettingsView(model: model))
         delegate = self
         center()
     }
@@ -36,12 +36,156 @@ final class SettingsWindow: NSWindow, NSWindowDelegate {
 }
 
 private struct SettingsView: View {
+    @ObservedObject var model: GlowModel
+
     var body: some View {
         Form {
+            MusicSection(model: model)
             AboutSection()
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 360)
+        .frame(width: 500, height: 480)
+    }
+}
+
+/// Chooses where Music mode listens: the chosen apps or all apps. The app checklist
+/// opens in a sheet so the section stays short. Its list is gathered once when Settings opens: known
+/// music apps that are installed, the apps already chosen, and apps that are running now.
+private struct MusicSection: View {
+    @ObservedObject var model: GlowModel
+    @State private var apps = MusicApp.candidates()
+    @State private var choosingApps = false
+
+    var body: some View {
+        Section {
+            Picker("Listen to", selection: Binding(get: { model.musicSource },
+                                                   set: { model.selectMusicSource($0) })) {
+                ForEach(MusicSource.allCases) { Text($0.title).tag($0) }
+            }
+            if model.musicSource == .chosenApps {
+                LabeledContent("Apps") {
+                    HStack(spacing: 10) {
+                        Text(chosenSummary)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Button("Choose…") { choosingApps = true }
+                    }
+                }
+                .sheet(isPresented: $choosingApps) { MusicAppPicker(model: model, apps: apps) }
+            }
+        } header: {
+            Text("Music")
+        } footer: {
+            Text(footer)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var footer: String {
+        switch model.musicSource {
+        case .chosenApps:
+            return "Music mode reacts only to the apps you choose. Safari plays audio through a shared system process, so choose All apps to follow it."
+        case .allApps:
+            return "Music mode reacts to everything your Mac plays, including system sounds, videos, and calls."
+        }
+    }
+
+    /// The chosen apps by name, in the list's order, for example "Spotify, Music, and 2 more".
+    private var chosenSummary: String {
+        let names = apps.filter { model.musicApps.contains($0.id) }.map(\.name)
+        switch names.count {
+        case 0: return "None"
+        case 1...3: return names.joined(separator: ", ")
+        default: return names.prefix(2).joined(separator: ", ") + ", and \(names.count - 2) more"
+        }
+    }
+}
+
+/// The checklist of apps Music listens to, shown as a sheet over Settings.
+private struct MusicAppPicker: View {
+    @ObservedObject var model: GlowModel
+    let apps: [MusicApp]
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    ForEach(apps) { app in
+                        Toggle(isOn: chosen(app.id)) {
+                            HStack(spacing: 8) {
+                                Image(nsImage: app.icon).resizable().frame(width: 20, height: 20)
+                                    .accessibilityHidden(true)
+                                Text(app.name)
+                            }
+                        }
+                        .toggleStyle(.checkbox)
+                    }
+                } header: {
+                    Text("Apps Music Listens To")
+                } footer: {
+                    Text("Installed music apps and the apps running now. Changes apply right away.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .formStyle(.grouped)
+            Divider()
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+        }
+        .frame(width: 380, height: 440)
+    }
+
+    private func chosen(_ id: String) -> Binding<Bool> {
+        Binding(get: { model.musicApps.contains(id) }, set: { on in
+            if on {
+                if !model.musicApps.contains(id) { model.musicApps.append(id) }
+            } else {
+                model.musicApps.removeAll { $0 == id }
+            }
+        })
+    }
+}
+
+private struct MusicApp: Identifiable {
+    let id: String
+    let name: String
+    let icon: NSImage
+
+    /// Music players that are offered whenever they're installed, in this order.
+    private static let known = ["com.spotify.client", "com.apple.Music", "com.tidal.desktop", "com.amazon.music",
+                                "com.deezer.deezer-desktop", "com.apple.podcasts", "com.google.Chrome",
+                                "com.microsoft.edgemac", "org.mozilla.firefox"]
+
+    static func candidates() -> [MusicApp] {
+        let workspace = NSWorkspace.shared
+        let running = workspace.runningApplications.filter { $0.activationPolicy == .regular }
+        let chosen = UserDefaults.standard.stringArray(forKey: "musicApps") ?? GlowModel.defaultMusicApps
+        var ids: [String] = []
+        for id in known + chosen
+            + running.compactMap(\.bundleIdentifier).sorted()
+            where !ids.contains(id) && id != Bundle.main.bundleIdentifier {
+            ids.append(id)
+        }
+        return ids.compactMap { id in
+            if let url = workspace.urlForApplication(withBundleIdentifier: id) {
+                let name = FileManager.default.displayName(atPath: url.path)
+                return MusicApp(id: id, name: name.replacingOccurrences(of: ".app", with: ""),
+                                icon: workspace.icon(forFile: url.path))
+            }
+            // Keep a chosen app that has since been removed, so it can be unchecked.
+            guard chosen.contains(id),
+                  let fallback = NSImage(systemSymbolName: "app.dashed", accessibilityDescription: nil) else {
+                return nil
+            }
+            return MusicApp(id: id, name: id, icon: fallback)
+        }
     }
 }
 

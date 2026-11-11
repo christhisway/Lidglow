@@ -41,6 +41,42 @@ final class GlowModel: ObservableObject {
         }
     }
 
+    /// Where Music mode gets its sound. Chosen apps by default. Set it through `selectMusicSource(_:)`.
+    @Published private(set) var musicSource = UserDefaults.standard.string(forKey: "musicSource")
+        .flatMap(MusicSource.init(rawValue:)) ?? .chosenApps {
+        didSet {
+            UserDefaults.standard.set(musicSource.rawValue, forKey: "musicSource")
+            applyMusicSource()
+        }
+    }
+    static let defaultMusicApps = ["com.spotify.client", "com.apple.Music"]
+    /// Bundle IDs of the apps Music listens to when the source is `.chosenApps`.
+    @Published var musicApps = UserDefaults.standard.stringArray(forKey: "musicApps") ?? GlowModel.defaultMusicApps {
+        didSet {
+            UserDefaults.standard.set(musicApps, forKey: "musicApps")
+            applyMusicSource()
+        }
+    }
+
+    private var musicInput: SystemMusic.Source {
+        switch musicSource {
+        case .chosenApps: return .apps(Set(musicApps))
+        case .allApps: return .allApps
+        }
+    }
+
+    private func applyMusicSource() {
+        music.source = musicInput
+        // Clear an error from the previous source, so the next tick starts the new one.
+        if audioError && mode == .music { audioError = false; music.stop() }
+        speedUp()
+    }
+
+    /// Switches Music's source.
+    func selectMusicSource(_ source: MusicSource) {
+        musicSource = source
+    }
+
     @Published var idleGlow = UserDefaults.standard.bool(forKey: "idleGlow") {
         didSet { UserDefaults.standard.set(idleGlow, forKey: "idleGlow") }
     }
@@ -99,6 +135,14 @@ final class GlowModel: ObservableObject {
         distributed.addObserver(self, selector: #selector(lockSession), name: .init("com.apple.screenIsLocked"), object: nil)
         distributed.addObserver(self, selector: #selector(unlockSession), name: .init("com.apple.screenIsUnlocked"), object: nil)
         music.onSound = { [weak self] in self?.speedUp() }
+        music.source = musicInput
+        music.onFailure = { [weak self] error in
+            guard let self, self.mode == .music else { return }
+            self.pause()
+            self.audioError = true
+            self.publishStatus(error.localizedDescription)
+            self.publishLevel(0)
+        }
         music.preset = eqPreset
         otherApps.onChange = { [weak self] in self?.otherAppsChanged() }
     }
@@ -261,7 +305,7 @@ final class GlowModel: ObservableObject {
             publishStatus("Paused while the lid or screen is inactive")
             return
         }
-        if mode == .music && !music.running && !audioError {
+        if mode == .music && !music.started && !audioError {
             do { try music.start() }
             catch {
                 pause()
@@ -284,8 +328,17 @@ final class GlowModel: ObservableObject {
             let pulse = min(1, max(0, (signal - SystemMusic.soundThreshold) * sensitivity))
             let base = idleGlow ? min(idleBrightness, brightness * 0.90) : 0
             target = base + (brightness - base) * pulse
-            label = lastSignal.map { now - $0 < Self.silenceDelay } == true
-                ? "Reacting to system audio" : "Waiting for music · Play something on your Mac"
+            if lastSignal.map({ now - $0 < Self.silenceDelay }) == true {
+                switch musicSource {
+                case .chosenApps: label = "Reacting to your music apps"
+                case .allApps: label = "Reacting to system audio"
+                }
+            } else if music.waitingForApps {
+                label = musicApps.isEmpty ? "No music apps chosen · Choose them in Settings"
+                                          : "Waiting for music · Open a music app chosen in Settings"
+            } else {
+                label = "Waiting for music · Play something on your Mac"
+            }
         }
         if hasHardware {
             let following: Bool

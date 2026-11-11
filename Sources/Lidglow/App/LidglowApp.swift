@@ -78,7 +78,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     @objc private func openSettings() {
         closePanel()
         if settingsWindow == nil {
-            settingsWindow = SettingsWindow { [weak self] in self?.settingsWindow = nil }
+            settingsWindow = SettingsWindow(model: model) { [weak self] in self?.settingsWindow = nil }
         }
         // Lidglow is a menu-bar app, so it has to activate itself or the window opens behind other apps.
         NSApp.activate()
