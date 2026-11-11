@@ -39,6 +39,8 @@ or delete Lidglow.app from Applications. Optional cleanup:
 - Settings: run  defaults delete io.github.christhisway.lidglow
 - Audio permission: System Settings > Privacy & Security > Screen & System
   Audio Recording
+- Microphone permission (if you used it): System Settings > Privacy &
+  Security > Microphone
 - Login item: System Settings > General > Login Items
 If the logo still looks wrong afterwards, restart your Mac.
 

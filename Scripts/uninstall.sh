@@ -4,7 +4,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/uninstall.sh | bash
 #
 # Add --reset-permission (after `bash -s --` when piping) to also reset Lidglow's System Audio
-# Recording permission. Nothing here needs sudo.
+# Recording and Microphone permissions. Nothing here needs sudo.
 #
 # Optional setting:
 #   LIDGLOW_INSTALL_DIR  look for Lidglow.app only here, instead of /Applications and ~/Applications
@@ -37,8 +37,13 @@ for folder in "${folders[@]}"; do
 done
 
 # 2. Remove the login item while the app still exists, since only the app can unregister itself.
+# Builds without the flag would start the full app instead, so only run ones that have it.
 for app in "${apps[@]+"${apps[@]}"}"; do
-    "$app/Contents/MacOS/Lidglow" --unregister-login-item 2>/dev/null || true
+    if grep -qa -- "--unregister-login-item" "$app/Contents/MacOS/Lidglow"; then
+        "$app/Contents/MacOS/Lidglow" --unregister-login-item 2>/dev/null || true
+    else
+        say "This Lidglow is too old to remove its own login item. If it's in System Settings → General → Login Items, remove it there."
+    fi
 done
 agent="$HOME/Library/LaunchAgents/$bundle_id.plist"
 if [[ -f "$agent" ]]; then
@@ -52,7 +57,12 @@ if $reset_permission; then
     if tccutil reset AudioCapture "$bundle_id" >/dev/null 2>&1; then
         say "Reset the System Audio Recording permission"
     else
-        say "Couldn't reset the permission. Remove Lidglow in System Settings → Privacy & Security → Screen & System Audio Recording."
+        say "Couldn't reset the System Audio Recording permission. Remove Lidglow in System Settings → Privacy & Security → Screen & System Audio Recording."
+    fi
+    if tccutil reset Microphone "$bundle_id" >/dev/null 2>&1; then
+        say "Reset the Microphone permission"
+    else
+        say "Couldn't reset the Microphone permission. Remove Lidglow in System Settings → Privacy & Security → Microphone."
     fi
 fi
 

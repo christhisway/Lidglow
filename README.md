@@ -32,7 +32,7 @@ Run this in Terminal:
 curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/uninstall.sh | bash
 ```
 
-It quits Lidglow normally so the logo goes back to macOS, removes its login item, deletes `Lidglow.app` and its settings. To also reset the System Audio Recording permission, add `-s -- --reset-permission` after `bash`.
+It quits Lidglow normally so the logo goes back to macOS, removes its login item, deletes `Lidglow.app` and its settings. To also reset the System Audio Recording and Microphone permissions, add `-s -- --reset-permission` after `bash`.
 
 To uninstall by hand:
 
@@ -42,6 +42,7 @@ To uninstall by hand:
 4. Optional cleanup:
    - Remove its settings: `defaults delete io.github.christhisway.lidglow`
    - Remove its audio permission in **System Settings → Privacy & Security → Screen & System Audio Recording**, or with `tccutil reset AudioCapture io.github.christhisway.lidglow` (before deleting the app).
+   - If you used **Microphone**, remove that permission in **System Settings → Privacy & Security → Microphone**, or with `tccutil reset Microphone io.github.christhisway.lidglow` (before deleting the app).
 5. If the logo still looks wrong afterwards, restart your Mac.
 
 ## Use Lidglow
