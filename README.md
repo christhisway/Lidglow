@@ -13,11 +13,24 @@ If Music remains on “Waiting for music” during playback, use **System Audio 
 
 Audio processing runs locally through a private Core Audio tap. The app reduces playback to a level driven by bass and drum hits and discards the samples. Hardware modes pause when the session locks, the display sleeps, or the lid closes. Older Macs can use the in-panel preview.
 
+## Reporting bugs
+
+Lidglow has no network code, so it never sends crash reports or diagnostics anywhere. To report a problem, [open an issue](https://github.com/christhisway/Lidglow/issues/new/choose) and include what you can of the following:
+
+- **Crash reports:** open the Console app and choose **Crash Reports**, or look in `~/Library/Logs/DiagnosticReports/` for files whose names start with `Lidglow`.
+- **Recent logs:** run this in Terminal shortly after the problem happens:
+
+  ```sh
+  log show --last 10m --info --predicate 'subsystem == "io.github.christhisway.lidglow"'
+  ```
+
+  Lidglow logs when it takes and releases control of the logo, the result of its hardware check, and when the system audio tap starts, stops, or fails. The logs contain no audio and stay on your Mac until you share them.
+
 ## Project layout
 
 ```
 Sources/Lidglow/
-  App/        Entry point and application delegate (status item, panel window)
+  App/        Entry point, application delegate (status item, panel window), and local log categories
   Glow/       Glow modes and the model that drives the logo each tick
   UI/         SwiftUI controls, shared Liquid Glass styling, the borderless menu panel, the Settings window, and the animated laptop preview
   Audio/      Core Audio process tap and the BeatMeter detector

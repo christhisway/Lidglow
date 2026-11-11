@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import os
 
 final class GlowModel: ObservableObject {
     @Published private(set) var mode: GlowMode = .standard
@@ -61,6 +62,7 @@ final class GlowModel: ObservableObject {
 
     init() {
         status = idleStatus
+        Logger.hardware.notice("Hardware check: \(self.idleStatus, privacy: .public)")
         let events: [(NSNotification.Name, Selector)] = [
             (NSWorkspace.screensDidSleepNotification, #selector(screenSleep)),
             (NSWorkspace.screensDidWakeNotification, #selector(screenWake)),

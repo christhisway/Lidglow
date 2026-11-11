@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest an idea for Lidglow.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What would you like Lidglow to do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it would help
+      description: What are you trying to do that Lidglow doesn't support today?
+  - type: input
+    id: mac
+    attributes:
+      label: Mac model (optional)
+      description: Useful if the idea depends on your hardware.

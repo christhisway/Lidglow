@@ -1,5 +1,6 @@
 import CoreAudio
 import Foundation
+import os
 
 final class SystemMusic {
     struct TapError: LocalizedError {
@@ -75,7 +76,9 @@ final class SystemMusic {
                 if wake { DispatchQueue.main.async { [weak self] in self?.onSound?() } }
             }, "Audio callback")
             try check(AudioDeviceStart(device, callback), "System audio")
+            Logger.audio.notice("System audio tap started at \(format.mSampleRate) Hz")
         } catch {
+            Logger.audio.error("System audio tap failed: \(error.localizedDescription, privacy: .public)")
             stop()
             throw error
         }
@@ -88,6 +91,7 @@ final class SystemMusic {
     }
 
     func stop() {
+        if callback != nil { Logger.audio.notice("System audio tap stopped") }
         if let callback {
             AudioDeviceStop(device, callback)
             AudioDeviceDestroyIOProcID(device, callback)

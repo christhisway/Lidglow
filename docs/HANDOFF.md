@@ -16,6 +16,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | File | Role |
 | --- | --- |
 | `App/Main.swift` | Entry point; starts the accessory (menu-bar) app |
+| `App/Log.swift` | `Logger` categories for local diagnostics (hardware and audio, no audio data) |
 | `App/LidglowApp.swift` | Application delegate: status item and its context menu, panel window, positioning, event monitors, Settings window |
 | `Glow/GlowMode.swift` | The modes and their icons |
 | `Glow/GlowModel.swift` | Mode and settings state, tick loop, session lifecycle |

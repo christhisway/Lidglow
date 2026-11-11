@@ -1,0 +1,93 @@
+name: Bug report
+description: Something in Lidglow isn't working as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Lidglow has no network code, so it can't send crash reports by itself. The details below are what we'd otherwise never see. The README's [Reporting bugs](https://github.com/christhisway/Lidglow#reporting-bugs) section explains how to find crash reports and logs.
+  - type: input
+    id: mac
+    attributes:
+      label: Mac model and display
+      description: Apple menu → About This Mac.
+      placeholder: MacBook Pro 14-inch (M5), PROLED XDR display
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: macOS 26.1
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Lidglow version
+      description: Click the gear in the Lidglow panel, or Control-click the menu-bar icon and choose Open Settings…. The version is under About.
+      placeholder: 1.0 (1)
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode when it happened
+      options:
+        - Standard
+        - Breathe
+        - Music
+        - Switch off (macOS in control)
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: switch
+    attributes:
+      label: Was the switch in the panel's top-right corner on?
+      options:
+        - "On"
+        - "Off"
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the panel and choose Music.
+        2. Play a song in Spotify.
+        3. Close the lid.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+      description: Include what the lid logo did, if it's relevant.
+    validations:
+      required: true
+  - type: dropdown
+    id: other-apps
+    attributes:
+      label: Was another lid-logo utility running?
+      description: For example Backglow or LogoLight.
+      options:
+        - "No"
+        - "Yes"
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Crash report or log (optional)
+      description: Paste a crash report or the output of the log command from the README. Lidglow logs contain no audio.
+      render: text

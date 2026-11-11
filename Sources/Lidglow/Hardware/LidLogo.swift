@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import os
 
 final class LidLogo {
     let bridge = LogoBridge()
@@ -32,8 +33,15 @@ final class LidLogo {
     func takeControl() -> Bool {
         guard originalMode == nil else { return true }
         let mode = bridge.mode
-        guard mode >= 0, bridge.level.isFinite else { return false }
-        if mode == 0 && !bridge.enableLogo(true) { return false }
+        guard mode >= 0, bridge.level.isFinite else {
+            Logger.hardware.error("Couldn't read the logo state, so Lidglow didn't take control")
+            return false
+        }
+        if mode == 0 && !bridge.enableLogo(true) {
+            Logger.hardware.error("Couldn't enable the logo backlight")
+            return false
+        }
+        Logger.hardware.notice("Took control of the logo (backlight mode \(mode))")
         originalMode = mode
         direction = nil
         holding = false
@@ -57,6 +65,7 @@ final class LidLogo {
             }
         }
         if mode == 0 { _ = bridge.enableLogo(false) }
+        Logger.hardware.notice("Handed the logo back to macOS (backlight mode \(mode))")
         direction = nil
         holding = false
     }
