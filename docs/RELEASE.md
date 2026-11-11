@@ -20,13 +20,13 @@ Always export the same identity. A new certificate changes the app's designated 
 1. On a branch, bump both `CFBundleShortVersionString` and `CFBundleVersion` in `Sources/Lidglow/Resources/Info.plist`. Never change the bundle ID.
    - `CFBundleShortVersionString` stays numeric: 0.9.x for betas, 1.0 for the first stable release.
    - `CFBundleVersion` is a whole number that goes up by one every release, betas included, and never resets. Build 1 was the pre-beta `v1.0` tag, and 0.9.0 Beta is build 2.
-   - Keep `LidglowReleaseLabel` set to `Beta` for betas, so Settings → About reads, for example, "0.9.0 Beta (2)". Remove it for a stable release.
+   - Keep `LidglowReleaseLabel` set to `Beta` for betas. Remove it for a stable release. The Release workflow adds the beta number from the tag to the release build only, so in Beta 1 Settings → About reads "0.9.0 Beta 1 (2)". Local builds read "0.9.0 Beta (2)".
 2. In `docs/CHANGELOG.md`, move the **Unreleased** notes under a heading for the release: `## 0.9.0 Beta 1` for a beta, `## 1.0` for a stable release. A date may follow, as in `## 1.0 (2027-01-15)`. The workflow copies that section into the release notes.
 3. Merge the branch into `main`.
 4. In **Actions → Release → Run workflow**, keep the branch on `main` and enter the tag:
    - Betas: `v0.9.0-beta.1`, `v0.9.0-beta.2`, and so on.
    - Stable releases use three numbers with no suffix: 1.0 is `v1.0.0`.
-5. The workflow stops without releasing anything if the tag doesn't match `Info.plist`, the tag or release already exists, the signing secrets are missing, the zip lacks `LICENSE`, or the app isn't signed by `Lidglow Self-Signed`. Otherwise it creates a **draft** release from the exact commit it built, titled for example **Lidglow 0.9.0 Beta 1**, with both files attached and the notes filled in from the template below. Betas (`LidglowReleaseLabel` is `Beta`) are always marked as pre-releases, and stable releases never are.
+5. The workflow stops without releasing anything if the tag doesn't match `Info.plist`, the tag or release already exists, the signing secrets are missing, the zip lacks `LICENSE`, the app isn't signed by `Lidglow Self-Signed`, or the built app's release label doesn't match the tag. Otherwise it creates a **draft** release from the exact commit it built, titled for example **Lidglow 0.9.0 Beta 1**, with both files attached and the notes filled in from the template below. Betas (`LidglowReleaseLabel` is `Beta`) are always marked as pre-releases, and stable releases never are.
 6. Open the draft on the Releases page, read the notes, and click **Publish release**. Publishing creates the tag. A repository ruleset lets only admins create, move, or delete `v*` tags, which is why the workflow stops at a draft: it runs as `github-actions[bot]`, which can't create the tag.
 7. Test the update on a Mac that has the previous version: run the install command from the release notes, then confirm that Lidglow reopens, controls the logo, and Music doesn't ask for permission again.
 

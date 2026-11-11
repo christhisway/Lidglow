@@ -2,7 +2,8 @@
 # Builds Lidglow from main and creates a draft GitHub Release with Lidglow.zip and Lidglow.zip.sha256.
 # It only runs when started by hand: Actions → Release → Run workflow. See docs/RELEASE.md.
 # The release is always a draft: only admins may create v* tags (the "Protect release tags" ruleset),
-# so the owner publishes it, which creates the tag. Betas are always marked as pre-releases.
+# so the owner publishes it, which creates the tag. Betas are always marked as pre-releases, and the
+# release build carries the beta number from the tag, so Settings → About reads "0.9.0 Beta 1 (2)".
 #
 # Needs two repository secrets holding the owner's "Lidglow Self-Signed" identity:
 #   LIDGLOW_SIGNING_P12           the certificate and private key exported as .p12, base64-encoded
@@ -61,11 +62,13 @@ jobs:
               || fail "Info.plist says $version Beta, so the tag must look like v$tag_version-beta.1, not $TAG."
             display="$version Beta ${TAG##*-beta.}"
             prerelease=true
+            release_label="Beta ${TAG##*-beta.}"
           else
             [[ "$TAG" == "v$tag_version" ]] \
               || fail "Info.plist says $version, so the tag must be v$tag_version, not $TAG."
             display="$version"
             prerelease=false
+            release_label=""
           fi
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
             fail "The tag $TAG already exists."
@@ -87,6 +90,7 @@ jobs:
           echo "Releasing Lidglow $display (build $build) from $GITHUB_SHA as $TAG"
           echo "DISPLAY_NAME=$display" >> "$GITHUB_ENV"
           echo "PRERELEASE=$prerelease" >> "$GITHUB_ENV"
+          echo "RELEASE_LABEL=$release_label" >> "$GITHUB_ENV"
 
       - name: Import the signing identity
         env:
@@ -116,6 +120,14 @@ jobs:
           fi
           security find-identity -p codesigning "$keychain"
 
+      # Info.plist on main says "Beta". The release build says which beta, to match the tag and the
+      # release title. Only this runner's checkout changes. Nothing is committed.
+      - name: Add the beta number to the build
+        if: env.RELEASE_LABEL != ''
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :LidglowReleaseLabel $RELEASE_LABEL" Sources/Lidglow/Resources/Info.plist
+          echo "Settings → About will show the label \"$RELEASE_LABEL\"."
+
       - name: Build the release zip
         run: LIDGLOW_SIGN_IDENTITY="$SIGN_IDENTITY" Scripts/package.sh
 
@@ -130,6 +142,9 @@ jobs:
           codesign --verify --strict "$check/Lidglow.app" || fail "Lidglow.app's signature is invalid."
           codesign -dvv "$check/Lidglow.app" 2>&1 | grep -qx "Authority=$SIGN_IDENTITY" \
             || fail "Lidglow.app isn't signed by $SIGN_IDENTITY."
+          built_label="$(/usr/libexec/PlistBuddy -c 'Print :LidglowReleaseLabel' "$check/Lidglow.app/Contents/Info.plist" 2>/dev/null || true)"
+          [[ "$built_label" == "$RELEASE_LABEL" ]] \
+            || fail "Lidglow.app's release label is \"$built_label\", not \"$RELEASE_LABEL\"."
           zipinfo -1 "$release/Lidglow.zip" | grep -v '^Lidglow.app/'
 
       - name: Create the release
