@@ -16,13 +16,14 @@ struct GlowPanel: View {
     var body: some View {
         content
             // Take the natural height whatever the window's current height, and report it. The host view
-            // is always sized to exactly this height, so nothing is centered or clipped while it changes.
+            // is always at least as tall as the panel can get, so the content never overflows it and is
+            // never centered while the height changes.
             .fixedSize(horizontal: false, vertical: true)
             // A height preference read through a background GeometryReader only reported once in a
             // hosting controller sized by hand, so use a geometry observer, which fires on every change.
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { onHeightChange($0) }
-            // Pin the content to the top. Otherwise SwiftUI briefly centers new content in the old window
-            // height and animates that offset away, so the mode switcher and everything above it moved.
+            // Pin the content to the top of the tall host view, so the space below it stays empty and the
+            // window's bottom edge reveals or clips it.
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 

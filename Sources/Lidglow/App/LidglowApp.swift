@@ -170,10 +170,17 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         // The content is pinned to the top of a flexible frame, so propose no height to get its natural one.
         let natural = ceil(contentHeight ?? host.sizeThatFits(in: NSSize(width: width, height: 0)).height)
         guard natural > 0 else { return false }
-        let height = min(natural, top - visible.minY)
+        let available = top - visible.minY
+        let height = min(natural, available)
         let x = min(max(anchor.midX - width / 2, visible.minX), visible.maxX - width)
         let frame = NSRect(x: x, y: top - height, width: width, height: height)
-        host.view.frame = NSRect(x: 0, y: 0, width: width, height: natural)
+        // Keep the host as tall as the panel can ever get, pinned to the top of the flipped container,
+        // and let the window clip it. If the host were only the old content's height, SwiftUI would lay
+        // the taller content out in it first, and the hosting view would center the overflow. Moving it
+        // back once the new height arrived ran inside the mode change's animation, so the top of the
+        // panel slid while it grew (#51).
+        let hostFrame = NSRect(x: 0, y: 0, width: width, height: max(natural, available))
+        if host.view.frame != hostFrame { host.view.frame = hostFrame }
         guard animate, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
               panel.frame.height != height else {
             panel.setFrame(frame, display: true)
