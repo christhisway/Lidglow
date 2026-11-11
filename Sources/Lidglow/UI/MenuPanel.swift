@@ -19,7 +19,20 @@ final class MenuPanel: NSPanel {
                 return NSColor(white: isDark ? 0.06 : 1, alpha: isDark ? 0.42 : 0.24)
             }
             glass.contentView = content
-            return glass
+            // Liquid Glass draws a soft shadow just outside its shape. Inside a transparent window that
+            // shadow fills the corners with faint pixels, and macOS builds the window's shadow and its
+            // edge line from the window's alpha, so the panel got a near-rectangular outline: square at
+            // the bottom, where the glass shadow is strongest, and barely rounded at the top. Clipping
+            // the glass to its own shape leaves the corners fully transparent, so the system shadow
+            // follows the panel's rounded corners.
+            let clip = NSView()
+            clip.wantsLayer = true
+            clip.layer?.cornerRadius = radius
+            clip.layer?.cornerCurve = .continuous
+            clip.layer?.masksToBounds = true
+            glass.autoresizingMask = [.width, .height]
+            clip.addSubview(glass)
+            return clip
         }
         #endif
 

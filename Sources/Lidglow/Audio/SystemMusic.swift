@@ -1,5 +1,6 @@
 import CoreAudio
 import Foundation
+import os
 
 final class SystemMusic {
     struct TapError: LocalizedError {
@@ -31,6 +32,7 @@ final class SystemMusic {
     private let lock = NSLock()
     private var latest = (time: 0.0, level: 0.0)
     private var wakeArmed = false
+    private var requestedPreset = EQPreset.bass
     /// Meter level above which the glow treats audio as music rather than silence.
     static let soundThreshold = 0.035
     /// Called on the main queue the first time sound crosses the threshold after `armWake()`.
@@ -41,6 +43,12 @@ final class SystemMusic {
         lock.lock()
         wakeArmed = true
         lock.unlock()
+    }
+
+    /// Which part of the spectrum drives the level. The audio callback picks it up on its next buffer.
+    var preset: EQPreset {
+        get { lock.lock(); defer { lock.unlock() }; return requestedPreset }
+        set { lock.lock(); requestedPreset = newValue; lock.unlock() }
     }
 
     /// Starts listening. With selected apps, the tap is built when one of them has audio open and
@@ -141,6 +149,7 @@ final class SystemMusic {
             try check(AudioHardwareCreateAggregateDevice(configuration as CFDictionary, &device), "Audio device")
 
             var meter = BeatMeter(sampleRate: format.mSampleRate)
+            meter.preset = preset
             try check(AudioDeviceCreateIOProcIDWithBlock(&callback, device, nil) { [weak self] _, input, _, _, _ in
                 let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
                 guard let buffer = buffers.first(where: { $0.mData != nil }), let data = buffer.mData,
@@ -150,13 +159,17 @@ final class SystemMusic {
                 let level = meter.process(data.assumingMemoryBound(to: Float.self), frames: frames, channels: channels)
                 guard let self, self.lock.try() else { return }
                 self.latest = (ProcessInfo.processInfo.systemUptime, level)
+                // The callback never waits on the lock, so a preset change applies from the next buffer.
+                meter.preset = self.requestedPreset
                 let wake = self.wakeArmed && level > Self.soundThreshold
                 if wake { self.wakeArmed = false }
                 self.lock.unlock()
                 if wake { DispatchQueue.main.async { [weak self] in self?.onSound?() } }
             }, "Audio callback")
             try check(AudioDeviceStart(device, callback), "System audio")
+            Logger.audio.notice("System audio tap started at \(format.mSampleRate) Hz")
         } catch {
+            Logger.audio.error("System audio tap failed: \(error.localizedDescription, privacy: .public)")
             teardownTap()
             throw error
         }
@@ -176,6 +189,7 @@ final class SystemMusic {
 
     private func teardownTap() {
         tappedProcesses = nil
+        if callback != nil { Logger.audio.notice("System audio tap stopped") }
         if let callback {
             AudioDeviceStop(device, callback)
             AudioDeviceDestroyIOProcID(device, callback)
