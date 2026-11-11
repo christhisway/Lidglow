@@ -58,10 +58,8 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         }
         setIcon(lit: true)
         #if compiler(>=6.4)
-        if #available(macOS 27, *) {
-            status.expandedInterfaceDelegate = self
-            usesMenuBarSession = true
-        }
+        status.expandedInterfaceDelegate = self
+        usesMenuBarSession = true
         #endif
         model.restoreSelectedMode()
     }
@@ -94,13 +92,13 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         // begin a menu bar session and open the panel over the menu, so detach the delegate meanwhile.
         // `performClick` returns once the menu closes.
         #if compiler(>=6.4)
-        if #available(macOS 27, *), usesMenuBarSession { item?.expandedInterfaceDelegate = nil }
+        if usesMenuBarSession { item?.expandedInterfaceDelegate = nil }
         #endif
         item?.menu = contextMenu
         item?.button?.performClick(nil)
         item?.menu = nil
         #if compiler(>=6.4)
-        if #available(macOS 27, *), usesMenuBarSession { item?.expandedInterfaceDelegate = self }
+        if usesMenuBarSession { item?.expandedInterfaceDelegate = self }
         #endif
     }
 
@@ -267,7 +265,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         #if compiler(>=6.4)
         // Closing for any other reason (Escape, a click outside, Settings) ends the menu bar session too.
         // Cancel after this returns, since cancelling calls back into the delegate.
-        if #available(macOS 27, *), let session = item?.expandedInterfaceSession {
+        if let session = item?.expandedInterfaceSession {
             DispatchQueue.main.async { session.cancel() }
         }
         #endif
@@ -300,7 +298,6 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
 }
 
 #if compiler(>=6.4)
-@available(macOS 27, *)
 extension LidglowApp: NSStatusItemExpandedInterfaceDelegate {
     func statusItem(_ statusItem: NSStatusItem,
                     didBegin expandedInterfaceSession: NSStatusItemExpandedInterfaceSession) {
