@@ -418,9 +418,11 @@ final class GlowModel: ObservableObject {
             }
             // A finished turn doesn't replace a pending prompt from the same agent.
             let previous = waitingAgents[request.agent]
+            // The app the agent's process runs under, or else the one its hook's environment named.
+            let app = request.pid.flatMap(AgentClickWatcher.hostApp(ofProcess:)) ?? request.app
             waitingAgents[request.agent] = WaitingAgent(
                 signal: previous?.signal == .attention ? .attention : request.signal,
-                app: request.app ?? previous?.app, since: now)
+                app: app ?? previous?.app, since: now)
             updateClickWatch()
             lastAgentSignal = now
             // With the switch off there's no glow loop, so start one just for the pulse. With it on, a

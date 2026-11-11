@@ -39,13 +39,15 @@ enum CodingAgent: String, CaseIterable, Identifiable {
     /// launches it, and it always succeeds, so the agent never reports a hook error. `open -g` delivers
     /// the link without bringing anything to the front.
     ///
-    /// `attention` and `done` also name the app the agent runs in, so a click in that app can stop the
-    /// pulse. macOS sets `__CFBundleIdentifier` to the bundle ID of the app that launched a process, and
-    /// child processes inherit it: the Claude app, VS Code, or Terminal, for example. It isn't documented,
-    /// so if it's empty the link carries an empty `app`, which Lidglow treats as no app.
+    /// `attention` and `done` also identify the app the agent runs in, so a click in that app can stop the
+    /// pulse. `pid` is the hook shell's parent, the agent's own process, which Lidglow walks up to the app
+    /// it runs under (`AgentClickWatcher.hostApp(ofProcess:)`). `app` is the fallback when that walk finds
+    /// no app: macOS sets `__CFBundleIdentifier` to the bundle ID of the app that launched a process, and
+    /// children usually inherit it, but it's undocumented and some agents run without it (Codex under the
+    /// ChatGPT app does). An empty value counts as none.
     func hookCommand(_ signal: AgentSignal) -> String {
         let link = "lidglow://agent/\(signal.rawValue)?agent=\(rawValue)"
-        let target = signal == .clear ? "'\(link)'" : "'\(link)&app='$__CFBundleIdentifier"
+        let target = signal == .clear ? "'\(link)'" : "'\(link)&app='$__CFBundleIdentifier'&pid='$PPID"
         return "pgrep -qx Lidglow && open -g \(target) || true"
     }
 
@@ -106,14 +108,18 @@ enum AgentSignal: String {
     case clear
 }
 
-/// A `lidglow://agent/<signal>?agent=<name>[&app=<bundle ID>]` link from an agent hook. Any app can open a
-/// `lidglow://` link, so anything that isn't exactly this shape, with a known signal and agent, is
-/// rejected. `app` is optional and must look like a bundle ID. An empty `app` counts as none.
+/// A `lidglow://agent/<signal>?agent=<name>[&app=<bundle ID>][&pid=<process ID>]` link from an agent hook.
+/// Any app can open a `lidglow://` link, so anything that isn't exactly this shape, with a known signal
+/// and agent first, is rejected. `app` must look like a bundle ID and `pid` must be a positive number,
+/// each at most once. An empty value counts as none. Either only decides which app's clicks stop the
+/// pulse, so a wrong one can't do more than that.
 struct AgentRequest: Equatable {
     let signal: AgentSignal
     let agent: CodingAgent
-    /// The bundle ID of the app the agent runs in, whose windows stop its pulse when clicked.
+    /// The bundle ID of the app the agent runs in, according to the hook's environment.
     let app: String?
+    /// The agent's own process, which Lidglow walks up to the app it runs under.
+    let pid: pid_t?
 
     init?(url: URL) {
         guard url.scheme?.lowercased() == "lidglow", url.host()?.lowercased() == "agent",
@@ -121,21 +127,32 @@ struct AgentRequest: Equatable {
               parts.user == nil, parts.password == nil, parts.port == nil, parts.fragment == nil,
               url.pathComponents.count == 2,
               let signal = AgentSignal(rawValue: url.pathComponents[1]),
-              let query = parts.queryItems, (1...2).contains(query.count),
+              let query = parts.queryItems, (1...3).contains(query.count),
               query[0].name == "agent",
               let agent = query[0].value.flatMap(CodingAgent.init(rawValue:)) else { return nil }
         var app: String?
-        if query.count == 2 {
-            guard query[1].name == "app" else { return nil }
-            let value = query[1].value ?? ""
-            if !value.isEmpty {
-                guard Self.isBundleID(value) else { return nil }
-                app = value
+        var pid: pid_t?
+        var seen: Set<String> = []
+        for item in query.dropFirst() {
+            guard seen.insert(item.name).inserted else { return nil }
+            let value = item.value ?? ""
+            switch item.name {
+            case "app":
+                guard value.isEmpty || Self.isBundleID(value) else { return nil }
+                app = value.isEmpty ? nil : value
+            case "pid":
+                guard !value.isEmpty else { break }
+                guard value.count <= 10, value.allSatisfy({ ("0"..."9").contains($0) }),
+                      let number = pid_t(value), number > 1 else { return nil }
+                pid = number
+            default:
+                return nil
             }
         }
         self.signal = signal
         self.agent = agent
         self.app = app
+        self.pid = pid
     }
 
     /// Reverse-DNS, at least two parts, and only the characters bundle IDs allow.

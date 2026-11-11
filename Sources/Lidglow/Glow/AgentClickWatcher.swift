@@ -29,6 +29,32 @@ final class AgentClickWatcher {
 
     deinit { stop() }
 
+    /// The app an agent runs in, found by walking up from the agent's process to the first ancestor that's a
+    /// regular app with a Dock icon. The agent is usually a helper or command-line process: Codex's
+    /// bundled CLI under the ChatGPT app, Claude Code under the Claude app, or a shell under Terminal or
+    /// VS Code. Nil when no ancestor is an app, for example under tmux, whose server has no app parent.
+    static func hostApp(ofProcess pid: pid_t) -> String? {
+        var current = pid
+        for _ in 0..<32 {
+            guard current > 1 else { return nil }
+            if let app = NSRunningApplication(processIdentifier: current), app.activationPolicy == .regular,
+               let id = app.bundleIdentifier, id != Bundle.main.bundleIdentifier {
+                return id
+            }
+            guard let parent = parentProcess(of: current), parent != current else { return nil }
+            current = parent
+        }
+        return nil
+    }
+
+    private static func parentProcess(of pid: pid_t) -> pid_t? {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var name: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
+        guard sysctl(&name, u_int(name.count), &info, &size, nil, 0) == 0, size > 0 else { return nil }
+        return info.kp_eproc.e_ppid
+    }
+
     private func clicked() {
         // The topmost window at the pointer, from any app, then its owner. Only the owner's process ID is
         // read from the window list.
