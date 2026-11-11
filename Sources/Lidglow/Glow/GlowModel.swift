@@ -21,6 +21,14 @@ final class GlowModel: ObservableObject {
         didSet { UserDefaults.standard.set(sensitivity, forKey: "sensitivity") }
     }
 
+    @Published var eqPreset = UserDefaults.standard.string(forKey: "eqPreset")
+        .flatMap(EQPreset.init(rawValue:)) ?? .bass {
+        didSet {
+            UserDefaults.standard.set(eqPreset.rawValue, forKey: "eqPreset")
+            music.preset = eqPreset
+        }
+    }
+
     @Published var breatheSpeed = UserDefaults.standard.string(forKey: "breatheSpeed")
         .flatMap(BreatheSpeed.init(rawValue:)) ?? .normal {
         didSet {
@@ -87,6 +95,7 @@ final class GlowModel: ObservableObject {
         distributed.addObserver(self, selector: #selector(lockSession), name: .init("com.apple.screenIsLocked"), object: nil)
         distributed.addObserver(self, selector: #selector(unlockSession), name: .init("com.apple.screenIsUnlocked"), object: nil)
         music.onSound = { [weak self] in self?.speedUp() }
+        music.preset = eqPreset
     }
 
     var hasHardware: Bool { logo.bridge.hardwarePresent }

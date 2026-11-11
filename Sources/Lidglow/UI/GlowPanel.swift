@@ -30,9 +30,16 @@ struct GlowPanel: View {
                 control("Brightness", icon: "sun.max", value: $model.brightness, range: 0...1,
                         reading: model.brightness > 0 ? "\(Int((model.brightness * 100).rounded()))%" : "Off")
                 if model.mode == .breathe {
-                    speedControl
+                    choice("Speed", icon: "gauge.with.dots.needle.50percent", items: BreatheSpeed.allCases,
+                           selection: model.breatheSpeed, select: { model.breatheSpeed = $0 }) {
+                        "\($0.rawValue) breathing speed"
+                    }
                 }
                 if model.mode == .music {
+                    choice("Focus", icon: "slider.vertical.3", items: EQPreset.allCases,
+                           selection: model.eqPreset, select: { model.eqPreset = $0 }) {
+                        "\($0.rawValue): \($0.detail)"
+                    }
                     control("Sensitivity", icon: "waveform", value: $model.sensitivity, range: 0.4...2.0,
                             reading: String(format: "%.1f×", model.sensitivity))
                     VStack(alignment: .leading, spacing: 8) {
@@ -68,17 +75,21 @@ struct GlowPanel: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var speedControl: some View {
+    /// A compact glass selector for a small set of options, such as Breathe's speed.
+    private func choice<Item: Hashable & RawRepresentable<String>>(
+        _ title: String, icon: String, items: [Item], selection: Item, select: @escaping (Item) -> Void,
+        describe: @escaping (Item) -> String
+    ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("Speed", systemImage: "gauge.with.dots.needle.50percent")
+            Label(title, systemImage: icon)
                 .font(.subheadline.weight(.medium))
                 .accessibilityHidden(true)
-            GlassSegments(items: BreatheSpeed.allCases, selection: model.breatheSpeed,
-                          select: { model.breatheSpeed = $0 }) { speed in
-                Text(speed.rawValue)
+            GlassSegments(items: items, selection: selection, select: select) { item in
+                Text(item.rawValue)
                     .font(.caption.weight(.medium))
                     .frame(maxWidth: .infinity, minHeight: 24)
-                    .accessibilityLabel("\(speed.rawValue) breathing speed")
+                    .help(describe(item))
+                    .accessibilityLabel(describe(item))
             }
         }
         .padding(.horizontal, 12)
