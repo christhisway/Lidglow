@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import Foundation
 
 /// Which part of the spectrum drives the glow in Music mode.

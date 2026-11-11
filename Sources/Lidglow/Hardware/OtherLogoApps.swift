@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import AppKit
 
 /// Recognizes some other lid-logo apps by bundle ID, so Lidglow can step aside before the two fight and

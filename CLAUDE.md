@@ -21,3 +21,4 @@
 - **Hardware safety:** Logo control goes through a private CoreBrightness interface. Keep hardware detection and restore-to-macOS behavior (switch off, quit, lock, sleep, lid close) intact on every change to `Hardware/` or `Glow/`.
 - **Versioning:** Only bump `CFBundleShortVersionString` and `CFBundleVersion` in `Sources/Lidglow/Resources/Info.plist` when asked, and always bump both. Never change the bundle ID.
 - **Docs:** When adding, moving, or renaming source files, update the layout in `README.md` and the source map in `docs/HANDOFF.md`.
+- **License:** Lidglow is GPL-3.0-or-later. Start every new source file with the `SPDX-License-Identifier: GPL-3.0-or-later` comment line (after the `#!` line in scripts). Don't copy code from other projects unless its license is compatible, and credit it if you do.

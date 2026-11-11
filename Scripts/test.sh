@@ -1,4 +1,5 @@
 #!/bin/zsh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Builds and runs the synthetic beat detector check. Usage: Scripts/test.sh
 set -eu
 cd -- "${0:A:h}/.."

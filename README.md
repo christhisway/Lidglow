@@ -127,3 +127,19 @@ The default signature is ad hoc, which changes with every build, so macOS asks f
 Every release signed this way has the same designated requirement, so macOS keeps the audio and microphone permissions. For a notarized release instead, set `LIDGLOW_SIGN_IDENTITY` to a `Developer ID Application` identity. Only that kind of identity enables the hardened runtime, the microphone entitlement it requires, and a secure timestamp. Then submit and staple the app before distributing it. [Apple’s notarization instructions](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
 
 Lidglow uses the documented Core Audio tap interface and a dynamically loaded, private CoreBrightness interface. Hardware compatibility depends on macOS. [Apple’s Core Audio documentation](https://developer.apple.com/documentation/coreaudio/capturing-system-audio-with-core-audio-taps) · [LogoLight’s CoreBrightness research](https://github.com/Ark0N/LogoLight/blob/main/docs/corebrightnessd.md)
+
+## Contributing
+
+Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Commits need a [DCO](https://developercertificate.org/) sign-off (`git commit -s`). Report security problems privately, as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+Copyright © 2026 christhisway and Lidglow contributors.
+
+Lidglow is free software: you can redistribute it and modify it under the terms of the [GNU General Public License](LICENSE), version 3 or (at your option) any later version. Anything you distribute that's based on Lidglow must also be released under the GPL, with its full source. Lidglow comes with **no warranty**. See the license for details.
+
+Lidglow can't be offered on the Mac App Store, because it relies on a private macOS interface (CoreBrightness) to control the logo.
+
+**Name and icon:** the license covers the code, not the Lidglow name or icon. Forks are welcome, but if you distribute your own builds, please give them a different name and icon so people can tell them apart.
+
+**Not affiliated with Apple.** Lidglow isn't made, endorsed, or supported by Apple. Apple, the Apple logo, Mac, MacBook Pro, and macOS are trademarks of Apple Inc.

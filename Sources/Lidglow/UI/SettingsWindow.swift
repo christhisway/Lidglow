@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import AppKit
 import ServiceManagement
 import SwiftUI
@@ -276,6 +278,7 @@ enum ProjectLinks {
     static let repository = URL(string: "https://github.com/christhisway/Lidglow")!
     static let readme = URL(string: "https://github.com/christhisway/Lidglow#readme")!
     static let releases = URL(string: "https://github.com/christhisway/Lidglow/releases")!
+    static let license = URL(string: "https://github.com/christhisway/Lidglow/blob/main/LICENSE")!
 }
 
 private struct AboutSection: View {
@@ -309,6 +312,12 @@ private struct AboutSection: View {
             }
             Link("Read Me", destination: ProjectLinks.readme)
             Link("Source Code on GitHub", destination: ProjectLinks.repository)
+            LabeledContent {
+                Link("View License", destination: ProjectLinks.license)
+            } label: {
+                Text("License")
+                Text("Free software under the GNU GPL v3 or later, with no warranty. Not affiliated with Apple.")
+            }
         }
     }
 }

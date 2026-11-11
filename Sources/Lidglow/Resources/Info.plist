@@ -11,6 +11,7 @@
     <key>CFBundleVersion</key><string>1</string>
     <key>LSMinimumSystemVersion</key><string>14.2</string>
     <key>LSUIElement</key><true/>
+    <key>NSHumanReadableCopyright</key><string>Copyright © 2026 christhisway and Lidglow contributors. Licensed under the GNU GPL v3 or later.</string>
     <key>NSAudioCaptureUsageDescription</key>
     <string>Lidglow turns your Mac’s audio output into a brightness level for the lid logo as it plays. Audio is never recorded, saved, or sent anywhere.</string>
     <key>NSMicrophoneUsageDescription</key>
