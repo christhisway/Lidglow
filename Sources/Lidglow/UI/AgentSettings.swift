@@ -33,6 +33,10 @@ struct AgentsSection: View {
                     Text("Also pulse when an agent finishes")
                     Text("Otherwise only permission prompts and questions pulse the logo.")
                 }
+                Toggle(isOn: $model.agentAlertsClearOnClick) {
+                    Text("Stop pulsing when I click in the agent's app")
+                    Text("A click in any window of the app the agent runs in, such as the Claude app, VS Code, or Terminal, stops its pulse. Lidglow sees only which app was clicked, and only while a pulse is on.")
+                }
                 Toggle(isOn: $model.agentAlertsWhileOff) {
                     Text("Pulse even when Lidglow is off")
                     Text("Takes the logo from macOS for each pulse while the panel's switch is off, then hands it straight back.")
@@ -62,12 +66,13 @@ struct AgentsSection: View {
 
     private var footer: String {
         guard model.agentAlerts else {
-            return "Agents tell Lidglow only that they need you or finished, never what they're working on."
+            return "Agents tell Lidglow only that they need you or finished and which app they run in, never what they're working on."
         }
         let switchNote = model.agentAlertsWhileOff
             ? "It plays whether Lidglow's switch is on or off"
             : "It plays only while Lidglow's switch is on"
-        return "The pulse stops when you reply to the agent, open the Lidglow panel, or after the time above. \(switchNote), and pauses like any mode when you lock your Mac or close the lid. Agents tell Lidglow only that they need you or finished, never what they're working on."
+        let clickNote = model.agentAlertsClearOnClick ? ", click in the agent's app" : ""
+        return "The pulse stops when you reply to the agent\(clickNote), open the Lidglow panel, or after the time above. \(switchNote), and pauses like any mode when you lock your Mac or close the lid. Agents tell Lidglow only that they need you or finished and which app they run in, never what they're working on."
     }
 
     private func alerting(_ agent: CodingAgent) -> Binding<Bool> {
@@ -96,7 +101,7 @@ private struct AgentSetupSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            Text("Each hook does nothing unless Lidglow is running, and sends only the agent's name and whether it needs you, finished, or is working again.")
+            Text("Each hook does nothing unless Lidglow is running. It sends only the agent's name, whether it needs you, finished, or is working again, and which app it runs in, so a click there can stop the pulse.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

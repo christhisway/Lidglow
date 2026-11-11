@@ -5,7 +5,7 @@ Each release is also published on [GitHub Releases](https://github.com/christhis
 ## Unreleased
 
 ### Added
-- Agent alerts in Settings → Agents (off by default): the logo pulses over any mode, and optionally while Lidglow is off, when Claude Code or Codex needs your input or finishes, until you reply, open the panel, or it times out. Agents signal Lidglow through hooks you paste into their config, with a `lidglow://` link and no network access.
+- Agent alerts in Settings → Agents (off by default): the logo pulses over any mode, and optionally while Lidglow is off, when Claude Code or Codex needs your input or finishes, until you reply, click in the agent's app, open the panel, or it times out. Agents signal Lidglow through hooks you paste into their config, with a `lidglow://` link and no network access.
 
 ## 0.9.0 Beta 1
 

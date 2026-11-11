@@ -38,8 +38,15 @@ enum CodingAgent: String, CaseIterable, Identifiable {
     /// The shell command a hook runs. It does nothing unless Lidglow is already running, so an agent never
     /// launches it, and it always succeeds, so the agent never reports a hook error. `open -g` delivers
     /// the link without bringing anything to the front.
+    ///
+    /// `attention` and `done` also name the app the agent runs in, so a click in that app can stop the
+    /// pulse. macOS sets `__CFBundleIdentifier` to the bundle ID of the app that launched a process, and
+    /// child processes inherit it: the Claude app, VS Code, or Terminal, for example. It isn't documented,
+    /// so if it's empty the link carries an empty `app`, which Lidglow treats as no app.
     func hookCommand(_ signal: AgentSignal) -> String {
-        "pgrep -qx Lidglow && open -g 'lidglow://agent/\(signal.rawValue)?agent=\(rawValue)' || true"
+        let link = "lidglow://agent/\(signal.rawValue)?agent=\(rawValue)"
+        let target = signal == .clear ? "'\(link)'" : "'\(link)&app='$__CFBundleIdentifier"
+        return "pgrep -qx Lidglow && open -g \(target) || true"
     }
 
     /// The exact hooks to paste into the agent's config. Each event maps to one signal:
@@ -99,11 +106,14 @@ enum AgentSignal: String {
     case clear
 }
 
-/// A `lidglow://agent/<signal>?agent=<name>` link from an agent hook. Any app can open a `lidglow://`
-/// link, so anything that isn't exactly this shape, with a known signal and agent, is rejected.
+/// A `lidglow://agent/<signal>?agent=<name>[&app=<bundle ID>]` link from an agent hook. Any app can open a
+/// `lidglow://` link, so anything that isn't exactly this shape, with a known signal and agent, is
+/// rejected. `app` is optional and must look like a bundle ID. An empty `app` counts as none.
 struct AgentRequest: Equatable {
     let signal: AgentSignal
     let agent: CodingAgent
+    /// The bundle ID of the app the agent runs in, whose windows stop its pulse when clicked.
+    let app: String?
 
     init?(url: URL) {
         guard url.scheme?.lowercased() == "lidglow", url.host()?.lowercased() == "agent",
@@ -111,10 +121,29 @@ struct AgentRequest: Equatable {
               parts.user == nil, parts.password == nil, parts.port == nil, parts.fragment == nil,
               url.pathComponents.count == 2,
               let signal = AgentSignal(rawValue: url.pathComponents[1]),
-              let query = parts.queryItems, query.count == 1, query[0].name == "agent",
+              let query = parts.queryItems, (1...2).contains(query.count),
+              query[0].name == "agent",
               let agent = query[0].value.flatMap(CodingAgent.init(rawValue:)) else { return nil }
+        var app: String?
+        if query.count == 2 {
+            guard query[1].name == "app" else { return nil }
+            let value = query[1].value ?? ""
+            if !value.isEmpty {
+                guard Self.isBundleID(value) else { return nil }
+                app = value
+            }
+        }
         self.signal = signal
         self.agent = agent
+        self.app = app
+    }
+
+    /// Reverse-DNS, at least two parts, and only the characters bundle IDs allow.
+    private static func isBundleID(_ value: String) -> Bool {
+        let allowed = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-")
+        let parts = value.split(separator: ".", omittingEmptySubsequences: false)
+        return value.count <= 255 && value.allSatisfy(allowed.contains) && parts.count >= 2
+            && parts.allSatisfy { !$0.isEmpty }
     }
 }
 

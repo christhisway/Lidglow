@@ -179,7 +179,7 @@ final class GlowModel: ObservableObject {
         didSet {
             UserDefaults.standard.set(agentAlertsOnFinish, forKey: "agentAlertsOnFinish")
             if !agentAlertsOnFinish {
-                for (agent, signal) in waitingAgents where signal == .done { clear(agent) }
+                for (agent, waiting) in waitingAgents where waiting.signal == .done { clear(agent) }
             }
         }
     }
@@ -203,9 +203,28 @@ final class GlowModel: ObservableObject {
         as? Double ?? 1)) {
         didSet { UserDefaults.standard.set(agentAlertBrightness, forKey: "agentAlertBrightness") }
     }
+    /// Settings → Agents → Stop pulsing when I click in the agent's app. On by default. Clicks are watched
+    /// only while an agent that named its app is waiting.
+    @Published var agentAlertsClearOnClick = UserDefaults.standard.object(forKey: "agentAlertsClearOnClick") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(agentAlertsClearOnClick, forKey: "agentAlertsClearOnClick")
+            updateClickWatch()
+        }
+    }
+    private struct WaitingAgent {
+        var signal: AgentSignal
+        /// The bundle ID of the app the agent runs in, if its hook named one.
+        var app: String?
+        /// When its latest signal arrived, in system uptime.
+        var since: Double
+    }
     /// The agents waiting on the user, and why. The logo pulses while this isn't empty, whatever the mode,
     /// then goes back to the mode. Not saved: a relaunch starts with nothing waiting.
-    private var waitingAgents: [CodingAgent: AgentSignal] = [:]
+    private var waitingAgents: [CodingAgent: WaitingAgent] = [:]
+    private let clickWatcher = AgentClickWatcher()
+    /// A click this soon after an agent's signal doesn't clear it, so a click already under way when the
+    /// agent finished doesn't cancel the pulse before it's seen.
+    private static let clickGrace = 1.0
     /// When the current pulse started, which sets its rhythm, and when the latest signal arrived, which
     /// the timeout counts from. Both use system uptime, like the glow loop.
     private var pulseStart: Double?
@@ -290,6 +309,7 @@ final class GlowModel: ObservableObject {
         music.preset = eqPreset
         otherApps.onChange = { [weak self] in self?.otherAppsChanged() }
         playback.onChange = { [weak self] playing in self?.playbackChanged(playing) }
+        clickWatcher.onClick = { [weak self] app in self?.clicked(in: app) }
     }
 
     /// The logo can be controlled: the hardware is there and the private CoreBrightness interface looks
@@ -397,7 +417,11 @@ final class GlowModel: ObservableObject {
                 pulseReducesMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
             }
             // A finished turn doesn't replace a pending prompt from the same agent.
-            if waitingAgents[request.agent] != .attention { waitingAgents[request.agent] = request.signal }
+            let previous = waitingAgents[request.agent]
+            waitingAgents[request.agent] = WaitingAgent(
+                signal: previous?.signal == .attention ? .attention : request.signal,
+                app: request.app ?? previous?.app, since: now)
+            updateClickWatch()
             lastAgentSignal = now
             // With the switch off there's no glow loop, so start one just for the pulse. With it on, a
             // stopped loop is waiting for the user to retry (or for another logo app to quit), so leave it.
@@ -408,13 +432,34 @@ final class GlowModel: ObservableObject {
     private func clear(_ agent: CodingAgent) {
         guard waitingAgents.removeValue(forKey: agent) != nil else { return }
         Logger.agents.notice("\(agent.title, privacy: .public) no longer needs attention")
+        updateClickWatch()
         if waitingAgents.isEmpty { pulseEnded() }
     }
 
     private func clearAgents() {
         guard !waitingAgents.isEmpty else { return }
         waitingAgents = [:]
+        updateClickWatch()
         pulseEnded()
+    }
+
+    /// Watches clicks only while it's turned on and a waiting agent named its app.
+    private func updateClickWatch() {
+        if agentAlertsClearOnClick && waitingAgents.values.contains(where: { $0.app != nil }) {
+            clickWatcher.start()
+        } else {
+            clickWatcher.stop()
+        }
+    }
+
+    /// A click landed in a window of `app`. Every agent waiting in that app is cleared, as if it had
+    /// reported working again, unless its signal arrived within the last second.
+    private func clicked(in app: String) {
+        let now = ProcessInfo.processInfo.systemUptime
+        for (agent, waiting) in waitingAgents where waiting.app == app && now - waiting.since >= Self.clickGrace {
+            Logger.agents.notice("Clicked in \(agent.title, privacy: .public)'s app")
+            clear(agent)
+        }
     }
 
     /// Hands the logo back to the mode, or to macOS if the switch is off, which also stops the glow loop.
@@ -435,10 +480,10 @@ final class GlowModel: ObservableObject {
     private var shouldRun: Bool { enabled || pulseStart != nil }
 
     private var agentStatus: String {
-        guard waitingAgents.count == 1, let (agent, signal) = waitingAgents.first else {
+        guard waitingAgents.count == 1, let (agent, waiting) = waitingAgents.first else {
             return "\(waitingAgents.count) agents are waiting for you"
         }
-        return signal == .attention ? "\(agent.title) needs your input" : "\(agent.title) finished"
+        return waiting.signal == .attention ? "\(agent.title) needs your input" : "\(agent.title) finished"
     }
 
     private func start() {
