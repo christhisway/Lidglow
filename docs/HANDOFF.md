@@ -25,7 +25,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `UI/GlassStyle.swift` | Shared Liquid Glass surfaces and the glass mode selector |
 | `UI/LaptopPreview.swift` | SceneKit intro and live logo close-up |
 | `UI/LaptopChassis.swift` | Laptop geometry and materials |
-| `UI/MenuPanel.swift` | Borderless key-capable panel |
+| `UI/MenuPanel.swift` | Borderless key-capable panel and its glass backdrop, clipped to its rounded shape so the window shadow follows the corners |
 | `UI/SettingsWindow.swift` | The Settings window and its About section, built on open and released on close |
 | `Audio/SystemMusic.swift` | Core Audio tap lifecycle |
 | `Audio/BeatMeter.swift` | Band transient detection and the Focus (EQ) presets |
