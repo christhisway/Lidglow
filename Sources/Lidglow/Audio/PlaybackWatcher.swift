@@ -3,9 +3,11 @@ import Foundation
 import os
 
 /// Tells whether any of the chosen music apps is playing, for switching to Music automatically.
-/// It reads Core Audio's per-process `kAudioProcessPropertyIsRunningOutput`, which says whether a
-/// process has an output stream running. That is "playing" as opposed to "silent", so quiet passages
-/// don't count as stopped. It needs no tap and never touches audio. Everything is driven by property
+/// It reads Core Audio's per-process `kAudioProcessPropertyIsRunning`, which says whether a process has
+/// audio I/O running. That is "playing" as opposed to "silent", so quiet passages don't count as stopped.
+/// `kAudioProcessPropertyIsRunningOutput` would be more precise, but on macOS 27 its listeners never fire
+/// (reading it works), so Lidglow only ever saw the state at launch. `IsRunning` notifies on play and,
+/// about 2 s later, on pause. It needs no tap and never touches audio. Everything is driven by property
 /// listeners on the process objects and on the process list, with no polling.
 final class PlaybackWatcher {
     /// Apps to watch, matched with their helpers exactly as Music's tap matches them.
@@ -14,14 +16,14 @@ final class PlaybackWatcher {
     }
     /// Called on the main queue when `playing` changes.
     var onChange: ((Bool) -> Void)?
-    /// At least one watched process has a running output stream.
+    /// At least one watched process has audio running.
     private(set) var playing = false
 
     private var watching = false
     private var listListener: AudioObjectPropertyListenerBlock?
     private var watched: [AudioObjectID: AudioObjectPropertyListenerBlock] = [:]
-    private static var runningOutputAddress = AudioObjectPropertyAddress(
-        mSelector: kAudioProcessPropertyIsRunningOutput,
+    private static var runningAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioProcessPropertyIsRunning,
         mScope: kAudioObjectPropertyScopeGlobal,
         mElement: kAudioObjectPropertyElementMain)
 
@@ -47,7 +49,7 @@ final class PlaybackWatcher {
         }
         listListener = nil
         for (process, listener) in watched {
-            AudioObjectRemovePropertyListenerBlock(process, &Self.runningOutputAddress, .main, listener)
+            AudioObjectRemovePropertyListenerBlock(process, &Self.runningAddress, .main, listener)
         }
         watched = [:]
         playing = false
@@ -59,12 +61,12 @@ final class PlaybackWatcher {
         let processes = Set(SystemMusic.processes(matching: bundleIDs))
         for (process, listener) in watched where !processes.contains(process) {
             // A process that has gone away has already dropped its listeners, so a failure here is fine.
-            AudioObjectRemovePropertyListenerBlock(process, &Self.runningOutputAddress, .main, listener)
+            AudioObjectRemovePropertyListenerBlock(process, &Self.runningAddress, .main, listener)
             watched[process] = nil
         }
         for process in processes where watched[process] == nil {
             let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.update() }
-            if AudioObjectAddPropertyListenerBlock(process, &Self.runningOutputAddress, .main, listener) == noErr {
+            if AudioObjectAddPropertyListenerBlock(process, &Self.runningAddress, .main, listener) == noErr {
                 watched[process] = listener
             }
         }
@@ -73,17 +75,17 @@ final class PlaybackWatcher {
 
     private func update() {
         guard watching else { return }
-        let now = watched.keys.contains(where: Self.isRunningOutput)
+        let now = watched.keys.contains(where: Self.isRunning)
         guard now != playing else { return }
         playing = now
         Logger.audio.notice("Chosen music apps \(now ? "started" : "stopped", privacy: .public) playing")
         onChange?(now)
     }
 
-    private static func isRunningOutput(_ process: AudioObjectID) -> Bool {
+    private static func isRunning(_ process: AudioObjectID) -> Bool {
         var running: UInt32 = 0
         var size = UInt32(MemoryLayout<UInt32>.size)
-        return AudioObjectGetPropertyData(process, &runningOutputAddress, 0, nil, &size, &running) == noErr
+        return AudioObjectGetPropertyData(process, &runningAddress, 0, nil, &size, &running) == noErr
             && running != 0
     }
 }
