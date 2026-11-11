@@ -49,6 +49,8 @@ It quits Lidglow so the logo goes back to macOS, then removes the app, its login
 
 Quit any other app that controls the lid logo first, so the two don't fight over it.
 
+If Lidglow crashes or is force quit and the logo stays dim, dark, or stuck at one level, open Lidglow again. It repairs the logo when it starts.
+
 ## Features
 
 - **Standard** holds the logo at a brightness you choose.
