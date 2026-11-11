@@ -14,9 +14,9 @@ Releases go on [GitHub Releases](https://github.com/christhisway/Lidglow/release
    LIDGLOW_SIGN_IDENTITY="Lidglow Self-Signed" Scripts/package.sh
    ```
 4. Check the signature: unzip a copy of `build/release/Lidglow.zip` and run `codesign --verify --strict -dvv Lidglow.app`. Look for `Authority=Lidglow Self-Signed`.
-5. Tag the commit (for example `git tag v0.9.0-beta.1 && git push origin v0.9.0-beta.1`). Number betas of the same version `-beta.1`, `-beta.2`, and so on. Stable releases drop the suffix (`v1.0.0`).
-6. Create the release from that tag. Upload `build/release/Lidglow.zip` and `build/release/Lidglow.zip.sha256`, and use the notes template below. Title betas to match the tag, for example **Lidglow 0.9.0 Beta 1**, and mark them as a pre-release.
-7. Test the update on a Mac that has the previous version: run the install command, then confirm that Lidglow reopens, controls the logo, and Music doesn't ask for permission again.
+5. Tag the commit (for example `git tag v0.9.0-beta.1 && git push origin v0.9.0-beta.1`). Number betas of the same version `-beta.1`, `-beta.2`, and so on. Stable releases drop the suffix (`v1.0.0`). A repository ruleset lets only admins create, move, or delete `v*` tags.
+6. Create the release from that tag. Upload `build/release/Lidglow.zip` and `build/release/Lidglow.zip.sha256`, and use the notes template below, replacing `<tag>` with the release's tag. Title betas to match the tag, for example **Lidglow 0.9.0 Beta 1**, and mark them as a pre-release. The install command with no version installs GitHub's latest release, which never includes pre-releases, so betas are only installed by name.
+7. Test the update on a Mac that has the previous version: run the install command from the release notes, then confirm that Lidglow reopens, controls the logo, and Music doesn't ask for permission again.
 
 ## Release notes template
 
@@ -25,7 +25,7 @@ Releases go on [GitHub Releases](https://github.com/christhisway/Lidglow/release
 
 Run this in Terminal (it also updates an existing copy):
 
-    curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash -s -- <tag>
 
 Requires Apple silicon and macOS 27 or later. Lidglow isn't notarized by Apple. The Terminal
 installer opens it without a warning. If you download Lidglow.zip in a browser, open it once, then
