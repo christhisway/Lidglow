@@ -1,3 +1,4 @@
+import AppKit
 import CoreAudio
 import Foundation
 import os
@@ -12,8 +13,7 @@ import os
 /// listeners on the process objects and on the process list, with no polling.
 final class PlaybackWatcher {
     /// Apps to watch, matched with their helpers exactly as Music's tap matches them. Nil watches every
-    /// app except Lidglow, whose own tap runs audio input while Music is on, and the system sound server,
-    /// so alert and notification sounds don't count as playing.
+    /// app (see `otherApps()`).
     var bundleIDs: Set<String>? = [] {
         didSet { if watching && bundleIDs != oldValue { refresh() } }
     }
@@ -85,10 +85,22 @@ final class PlaybackWatcher {
         onChange?(now)
     }
 
+    /// Apple's own media helpers that carry app playback: WebKit plays Safari's (and other web views')
+    /// audio in its GPU process.
+    private static let appleMediaHelpers: Set<String> = ["com.apple.WebKit.GPU", "com.apple.WebKit.WebContent"]
+
+    /// For All apps: every process that plays on behalf of an app. That's any third-party process, any
+    /// regular Apple app (Music, TV, QuickTime Player, FaceTime), and WebKit's media helpers. It leaves out
+    /// Lidglow, whose own tap runs audio input while Music is on, and macOS's system processes, which play
+    /// alerts, volume-change feedback (`com.apple.MediaRemoteUIService`), and other interface sounds
+    /// (`systemsoundserverd` and the like). Runs only when the process list changes.
     private static func otherApps() -> [AudioObjectID] {
         let own = ProcessInfo.processInfo.processIdentifier
         return SystemMusic.allProcesses().filter { process in
-            SystemMusic.pid(of: process) != own && SystemMusic.bundleID(of: process) != "systemsoundserverd"
+            guard let pid = SystemMusic.pid(of: process), pid != own,
+                  let id = SystemMusic.bundleID(of: process), id.contains(".") else { return false }
+            if !id.hasPrefix("com.apple.") || appleMediaHelpers.contains(id) { return true }
+            return NSRunningApplication(processIdentifier: pid)?.activationPolicy == .regular
         }
     }
 

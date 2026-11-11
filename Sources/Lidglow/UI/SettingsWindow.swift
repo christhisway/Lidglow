@@ -80,7 +80,7 @@ private struct MusicSection: View {
                 Toggle(isOn: $model.autoMusic) {
                     Text("Automatically switch to Music")
                     Text(model.musicSource == .chosenApps ? "Switches to Music when a chosen app starts playing."
-                                                          : "Switches to Music when any app starts playing. Alert sounds don't count.")
+                                                          : "Switches to Music when any app starts playing. System sounds such as alerts and volume feedback don't count.")
                 }
             }
             Picker(selection: $model.musicTimeout) {
