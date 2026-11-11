@@ -12,6 +12,8 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     private let model = GlowModel()
     private var panel: MenuPanel?
     private var host: NSHostingController<GlowPanel>?
+    /// The latest panel height reported while a Reduce Motion resize waits for SwiftUI's update to finish.
+    private var pendingHeight: CGFloat?
     private var localMonitor: Any?
     private var outsideMonitor: Any?
     private var settingsWindow: SettingsWindow?
@@ -92,12 +94,30 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             let host = NSHostingController(rootView: GlowPanel(model: model, openSettings: { [weak self] in
                 self?.openSettings()
             }, onHeightChange: { [weak self] height in
-                // SwiftUI reports the new height in the same pass that adds or removes controls, so the
-                // window grows or shrinks with them rather than a run-loop pass later.
                 guard let self, self.panel?.isVisible == true else { return }
-                self.positionPanel(contentHeight: height, animate: true)
+                guard NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+                    // SwiftUI reports the new height in the same pass that adds or removes controls, so the
+                    // window grows or shrinks with them rather than a run-loop pass later. The animator
+                    // starts on the next frame, so this never resizes the window inside SwiftUI's update.
+                    self.positionPanel(contentHeight: height, animate: true)
+                    return
+                }
+                // Without animation the window would resize and redraw inside SwiftUI's layout pass, which
+                // re-entered it and left the panel at the wrong height with its content shifted. Resize once
+                // the update finishes instead, to the latest height reported.
+                let scheduled = self.pendingHeight != nil
+                self.pendingHeight = height
+                guard !scheduled else { return }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, let height = self.pendingHeight else { return }
+                    self.pendingHeight = nil
+                    guard self.panel?.isVisible == true else { return }
+                    self.positionPanel(contentHeight: height)
+                }
             }))
             host.sizingOptions = []
+            // `positionPanel` alone sizes the host, so window resizes never stretch it.
+            host.view.autoresizingMask = []
             // No scroll view: the panel always fits its content, and scrolling only ever revealed empty
             // space. The flipped container keeps the content pinned to the top while the window's
             // bottom edge moves.
