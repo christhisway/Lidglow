@@ -3,6 +3,7 @@ import SwiftUI
 
 struct GlowPanel: View {
     @ObservedObject var model: GlowModel
+    var openSettings: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack(spacing: 9) {
@@ -12,6 +13,16 @@ struct GlowPanel: View {
                     .foregroundStyle(.primary)
                 Text("Lidglow").font(.headline)
                 Spacer(minLength: 12)
+                Button(action: openSettings) {
+                    Image(systemName: "gearshape")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Settings (⌘,)")
+                .accessibilityLabel("Settings")
                 Toggle("Control the lid logo", isOn: Binding(get: { model.enabled }, set: model.setEnabled))
                     .toggleStyle(.switch)
                     .labelsHidden()
@@ -29,7 +40,17 @@ struct GlowPanel: View {
                 }
                 control("Brightness", icon: "sun.max", value: $model.brightness, range: 0...1,
                         reading: model.brightness > 0 ? "\(Int((model.brightness * 100).rounded()))%" : "Off")
+                if model.mode == .breathe {
+                    choice("Speed", icon: "gauge.with.dots.needle.50percent", items: BreatheSpeed.allCases,
+                           selection: model.breatheSpeed, select: { model.breatheSpeed = $0 }) {
+                        "\($0.rawValue) breathing speed"
+                    }
+                }
                 if model.mode == .music {
+                    choice("Focus", icon: "slider.vertical.3", items: EQPreset.allCases,
+                           selection: model.eqPreset, select: { model.eqPreset = $0 }) {
+                        "\($0.rawValue): \($0.detail)"
+                    }
                     control("Sensitivity", icon: "waveform", value: $model.sensitivity, range: 0.4...2.0,
                             reading: String(format: "%.1f×", model.sensitivity))
                     VStack(alignment: .leading, spacing: 8) {
@@ -63,6 +84,28 @@ struct GlowPanel: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity)
+    }
+
+    /// A compact glass selector for a small set of options, such as Breathe's speed.
+    private func choice<Item: Hashable & RawRepresentable<String>>(
+        _ title: String, icon: String, items: [Item], selection: Item, select: @escaping (Item) -> Void,
+        describe: @escaping (Item) -> String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: icon)
+                .font(.subheadline.weight(.medium))
+                .accessibilityHidden(true)
+            GlassSegments(items: items, selection: selection, select: select) { item in
+                Text(item.rawValue)
+                    .font(.caption.weight(.medium))
+                    .frame(maxWidth: .infinity, minHeight: 24)
+                    .help(describe(item))
+                    .accessibilityLabel(describe(item))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func control(_ title: String, icon: String, value: Binding<Double>, range: ClosedRange<Double>,
