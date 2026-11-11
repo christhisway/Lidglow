@@ -49,6 +49,7 @@ final class GlowModel: ObservableObject {
         didSet {
             UserDefaults.standard.set(musicSource.rawValue, forKey: "musicSource")
             applyMusicSource()
+            updatePlaybackWatch()
         }
     }
     /// The user picked Microphone, but macOS doesn't allow Lidglow to use it.
@@ -59,6 +60,7 @@ final class GlowModel: ObservableObject {
         didSet {
             UserDefaults.standard.set(musicApps, forKey: "musicApps")
             applyMusicSource()
+            updatePlaybackWatch()
         }
     }
 
@@ -98,7 +100,17 @@ final class GlowModel: ObservableObject {
         }
     }
 
-    /// Settings → Music → Switch back after silence. Music returns to the mode used before it once it has
+    /// Settings → Music → Automatically switch to Music. Off by default. Only the chosen apps trigger it:
+    /// All apps would switch on every alert, video, and call, and the microphone isn't playback.
+    @Published var autoMusic = UserDefaults.standard.bool(forKey: "autoMusic") {
+        didSet {
+            UserDefaults.standard.set(autoMusic, forKey: "autoMusic")
+            updatePlaybackWatch()
+        }
+    }
+
+    /// Settings → Music → Switch back after silence. It's the only way out of Music other than picking a
+    /// mode, including after an automatic switch. Music returns to the mode used before it once it has
     /// heard nothing above `SystemMusic.soundThreshold` for this long. Ten seconds by default.
     @Published var musicTimeout = (UserDefaults.standard.object(forKey: "musicTimeout") as? Int)
         .flatMap(MusicTimeout.init(rawValue:)) ?? .tenSeconds {
@@ -130,6 +142,7 @@ final class GlowModel: ObservableObject {
     private let logo = LidLogo()
     private let music = SystemMusic()
     private let otherApps = OtherLogoApps()
+    private let playback = PlaybackWatcher()
     private var timer: Timer?
     private var phaseStart = 0.0
     private var sessionActive = true
@@ -180,6 +193,7 @@ final class GlowModel: ObservableObject {
         }
         music.preset = eqPreset
         otherApps.onChange = { [weak self] in self?.otherAppsChanged() }
+        playback.onChange = { [weak self] playing in self?.playbackChanged(playing) }
     }
 
     /// The logo can be controlled: the hardware is there and the private CoreBrightness interface looks
@@ -230,6 +244,26 @@ final class GlowModel: ObservableObject {
         enabled = on
         UserDefaults.standard.set(on, forKey: Self.enabledKey)
         start()
+        updatePlaybackWatch()
+    }
+
+    /// Watches the chosen apps only while automatic switching can act on them.
+    private func updatePlaybackWatch() {
+        playback.bundleIDs = Set(musicApps)
+        if autoMusic && enabled && musicSource == .chosenApps {
+            playback.start()
+        } else {
+            playback.stop()
+        }
+    }
+
+    /// A chosen app started playing. Switching happens only when playback starts, so a mode picked by hand
+    /// while music plays stays until playback stops and starts again. Stopping doesn't switch back: the
+    /// silence timeout does that.
+    private func playbackChanged(_ playing: Bool) {
+        guard playing, enabled, mode != .music else { return }
+        Logger.audio.notice("Switching to Music automatically")
+        select(.music)
     }
 
     private func start() {
