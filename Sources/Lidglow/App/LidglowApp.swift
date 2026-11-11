@@ -1,13 +1,17 @@
 import AppKit
-import Combine
 import SwiftUI
+
+/// Holds the panel's SwiftUI content at the top, so the content stays put while the window's height
+/// changes from the bottom edge.
+private final class TopAnchoredView: NSView {
+    override var isFlipped: Bool { true }
+}
 
 final class LidglowApp: NSObject, NSApplicationDelegate {
     private var item: NSStatusItem?
     private let model = GlowModel()
     private var panel: MenuPanel?
     private var host: NSHostingController<GlowPanel>?
-    private var layoutChanges: AnyCancellable?
     private var localMonitor: Any?
     private var outsideMonitor: Any?
     private var settingsWindow: SettingsWindow?
@@ -36,12 +40,6 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             button.alphaValue = button.alphaValue == 1 ? 0.98 : 1
         }
         setIcon(lit: true)
-        layoutChanges = Publishers.CombineLatest3(model.$mode, model.$idleGlow, model.$status)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                guard let self, self.panel?.isVisible == true else { return }
-                self.positionPanel()
-            }
         model.restoreSelectedMode()
     }
 
@@ -89,14 +87,21 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             return
         }
         if panel == nil {
-            let host = NSHostingController(rootView: GlowPanel(model: model))
+            let host = NSHostingController(rootView: GlowPanel(model: model) { [weak self] height in
+                // SwiftUI reports the new height in the same pass that adds or removes controls, so the
+                // window grows or shrinks with them rather than a run-loop pass later.
+                guard let self, self.panel?.isVisible == true else { return }
+                self.positionPanel(contentHeight: height, animate: true)
+            })
             host.sizingOptions = []
+            let document = TopAnchoredView()
+            document.addSubview(host.view)
             let scroll = NSScrollView()
             scroll.drawsBackground = false
             scroll.hasVerticalScroller = true
             scroll.scrollerStyle = .overlay
             scroll.autohidesScrollers = true
-            scroll.documentView = host.view
+            scroll.documentView = document
             let container = NSViewController()
             container.view = MenuPanel.backdrop(containing: scroll)
             container.addChild(host)
@@ -149,20 +154,35 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         return frame.insetBy(dx: -1, dy: -1).contains(NSEvent.mouseLocation)
     }
 
+    /// Places the panel under the menu-bar icon, clamped to the visible screen, and sizes it to its
+    /// content. Pass `contentHeight` when SwiftUI has already measured it. With `animate`, the frame
+    /// change follows the panel's own SwiftUI animation, keeping the top edge pinned under the icon.
     @discardableResult
-    private func positionPanel() -> Bool {
-        guard let panel, let host, let button = item?.button,
+    private func positionPanel(contentHeight: CGFloat? = nil, animate: Bool = false) -> Bool {
+        guard let panel, let host, let document = host.view.superview, let button = item?.button,
               let menuWindow = button.window, let screen = menuWindow.screen else { return false }
         let anchor = menuWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let visible = screen.visibleFrame.insetBy(dx: 6, dy: 6)
         let top = min(visible.maxY, anchor.minY - 6)
         guard top > visible.minY, visible.width > 0 else { return false }
         let width = min(350, visible.width)
-        let size = host.sizeThatFits(in: NSSize(width: width, height: 10_000))
-        let height = min(ceil(size.height), top - visible.minY)
+        let natural = ceil(contentHeight ?? host.sizeThatFits(in: NSSize(width: width, height: 10_000)).height)
+        guard natural > 0 else { return false }
+        let height = min(natural, top - visible.minY)
         let x = min(max(anchor.midX - width / 2, visible.minX), visible.maxX - width)
-        host.view.setFrameSize(NSSize(width: width, height: ceil(size.height)))
-        panel.setFrame(NSRect(x: x, y: top - height, width: width, height: height), display: true)
+        let frame = NSRect(x: x, y: top - height, width: width, height: height)
+        document.setFrameSize(NSSize(width: width, height: natural))
+        host.view.frame = NSRect(x: 0, y: 0, width: width, height: natural)
+        guard animate, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+              panel.frame.height != height else {
+            panel.setFrame(frame, display: true)
+            return true
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = GlowPanel.resizeDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrame(frame, display: true)
+        }
         return true
     }
 

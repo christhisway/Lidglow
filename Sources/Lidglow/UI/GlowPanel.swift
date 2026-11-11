@@ -3,7 +3,27 @@ import SwiftUI
 
 struct GlowPanel: View {
     @ObservedObject var model: GlowModel
+    /// Reports the panel's natural height whenever it changes, during the same layout pass that adds or
+    /// removes controls, so the window can resize along with them instead of a frame later.
+    var onHeightChange: (CGFloat) -> Void = { _ in }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var resize: Animation? { reduceMotion ? nil : .easeInOut(duration: Self.resizeDuration) }
+    static let resizeDuration = 0.22
+    private let reveal = AnyTransition.opacity
+
     var body: some View {
+        content
+            // Take the natural height whatever the window's current height, and report it. The host view
+            // is always sized to exactly this height, so nothing is centered or clipped while it changes.
+            .fixedSize(horizontal: false, vertical: true)
+            .background {
+                GeometryReader { Color.clear.preference(key: PanelHeight.self, value: $0.size.height) }
+            }
+            .onPreferenceChange(PanelHeight.self) { onHeightChange($0) }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack(spacing: 9) {
                 Image(systemName: "waveform.circle.fill")
@@ -30,17 +50,7 @@ struct GlowPanel: View {
                 control("Brightness", icon: "sun.max", value: $model.brightness, range: 0...1,
                         reading: model.brightness > 0 ? "\(Int((model.brightness * 100).rounded()))%" : "Off")
                 if model.mode == .music {
-                    control("Sensitivity", icon: "waveform", value: $model.sensitivity, range: 0.4...2.0,
-                            reading: String(format: "%.1f×", model.sensitivity))
-                    VStack(alignment: .leading, spacing: 8) {
-                        Toggle("Idle glow", isOn: $model.idleGlow).toggleStyle(.switch).controlSize(.small)
-                        if model.idleGlow {
-                            control("Idle brightness", icon: "moon", value: $model.idleBrightness,
-                                    range: model.idleBrightnessRange,
-                                    reading: "\(Int((model.idleBrightness * 100).rounded()))%")
-                                .disabled(model.brightness == 0)
-                        }
-                    }
+                    musicControls.transition(reveal)
                 }
             }
             // While macOS has the logo, the modes and their settings stay visible but inactive.
@@ -59,10 +69,31 @@ struct GlowPanel: View {
             if model.mode == .music {
                 Button("System Audio Settings…") { model.openAudioSettings() }
                     .buttonStyle(.link).font(.subheadline)
+                    .transition(reveal)
             }
         }
+        // The window animates to the new height over the same duration (see `LidglowApp.positionPanel`).
+        .animation(resize, value: model.mode)
+        .animation(resize, value: model.idleGlow)
         .padding(18)
         .frame(maxWidth: .infinity)
+    }
+
+    private var musicControls: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            control("Sensitivity", icon: "waveform", value: $model.sensitivity, range: 0.4...2.0,
+                    reading: String(format: "%.1f×", model.sensitivity))
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Idle glow", isOn: $model.idleGlow).toggleStyle(.switch).controlSize(.small)
+                if model.idleGlow {
+                    control("Idle brightness", icon: "moon", value: $model.idleBrightness,
+                            range: model.idleBrightnessRange,
+                            reading: "\(Int((model.idleBrightness * 100).rounded()))%")
+                        .disabled(model.brightness == 0)
+                        .transition(reveal)
+                }
+            }
+        }
     }
 
     private func control(_ title: String, icon: String, value: Binding<Double>, range: ClosedRange<Double>,
@@ -88,4 +119,9 @@ struct GlowPanel: View {
         .padding(.vertical, 8)
         .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
+}
+
+private struct PanelHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
