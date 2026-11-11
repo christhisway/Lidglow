@@ -27,7 +27,7 @@ These keep Lidglow safe to leave running all day. Pull requests that break them 
 
 ## Sign off your commits (DCO)
 
-Lidglow is licensed under the [GNU General Public License v3.0 or later](LICENSE). To keep every contribution clearly licensed, each commit must be signed off under the [Developer Certificate of Origin](https://developercertificate.org/). Signing off means you wrote the change, or otherwise have the right to submit it, under the project's license.
+Lidglow is licensed under the [GNU General Public License v3.0 or later](../LICENSE). To keep every contribution clearly licensed, each commit must be signed off under the [Developer Certificate of Origin](https://developercertificate.org/). Signing off means you wrote the change, or otherwise have the right to submit it, under the project's license.
 
 Add the sign-off with `-s`:
 

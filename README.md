@@ -73,13 +73,13 @@ Audio processing runs locally through a private Core Audio tap. The app reduces 
 
 ## Updating
 
-Lidglow never checks for updates itself, because it has no network code. New versions are posted on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with release notes, also kept in [CHANGELOG.md](CHANGELOG.md). To be notified, click **Watch → Custom → Releases** on the repository page. **Settings → About → View Releases** opens the page in your browser.
+Lidglow never checks for updates itself, because it has no network code. New versions are posted on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with release notes, also kept in [CHANGELOG.md](docs/CHANGELOG.md). To be notified, click **Watch → Custom → Releases** on the repository page. **Settings → About → View Releases** opens the page in your browser.
 
 To update, run the [install command](#install) again. It quits Lidglow normally so it hands the logo back to macOS, then replaces the app and opens it. If you installed by hand, quit Lidglow from the panel or its Control-click menu, then replace `Lidglow.app` with the new version and open it. An ad-hoc signed build may ask for System Audio Recording or Microphone permission again after an update.
 
 ## Privacy
 
-Lidglow records nothing and has no network code. Music mode reduces your Mac's audio output to a brightness level as it plays and then discards it. It uses the microphone only if you choose **Microphone** as Music's source, and only while Music is running. Settings are stored only in macOS preferences. Read the full [privacy statement](PRIVACY.md).
+Lidglow records nothing and has no network code. Music mode reduces your Mac's audio output to a brightness level as it plays and then discards it. It uses the microphone only if you choose **Microphone** as Music's source, and only while Music is running. Settings are stored only in macOS preferences. Read the full [privacy statement](docs/PRIVACY.md).
 
 ## Reporting bugs
 
@@ -106,7 +106,7 @@ Sources/Lidglow/
   Resources/  Info.plist and the entitlements used for Developer ID (hardened-runtime) signing
 Tests/BeatMeterTests/  Synthetic beat detector check
 Scripts/      build.sh, test.sh, package.sh (release zip and checksum), install.sh (the Terminal installer), and uninstall.sh
-docs/         Handoff notes, the end-user install guide, and the release checklist
+docs/         Handoff notes, the end-user install guide, the release checklist, the changelog, and the contributing, security, and privacy notes
 ```
 
 ## Build
@@ -132,7 +132,7 @@ Lidglow uses the documented Core Audio tap interface and a dynamically loaded, p
 
 ## Contributing
 
-Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Commits need a [DCO](https://developercertificate.org/) sign-off (`git commit -s`). Report security problems privately, as described in [SECURITY.md](SECURITY.md).
+Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](docs/CONTRIBUTING.md). Commits need a [DCO](https://developercertificate.org/) sign-off (`git commit -s`). Report security problems privately, as described in [SECURITY.md](docs/SECURITY.md).
 
 ## License
 

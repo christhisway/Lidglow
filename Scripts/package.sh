@@ -9,7 +9,7 @@ release="build/release"
 rm -rf -- "$release"
 mkdir -p "$release/stage"
 Scripts/build.sh "$release/stage/Lidglow.app"
-for file in LICENSE PRIVACY.md; do
+for file in LICENSE docs/PRIVACY.md; do
     if [[ -f "$file" ]]; then cp "$file" "$release/stage/"; fi
 done
 (cd "$release/stage" && ditto -c -k --sequesterRsrc --keepParent Lidglow.app ../Lidglow.zip)

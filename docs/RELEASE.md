@@ -8,7 +8,7 @@ Releases go on [GitHub Releases](https://github.com/christhisway/Lidglow/release
    - `CFBundleShortVersionString` stays numeric: 0.9.x for betas, 1.0 for the first stable release.
    - `CFBundleVersion` is a whole number that goes up by one every release, betas included, and never resets. Build 1 was the pre-beta `v1.0` tag, and 0.9.0 Beta is build 2.
    - Keep `LidglowReleaseLabel` set to `Beta` for betas, so Settings → About reads, for example, "0.9.0 Beta (2)". Remove it for a stable release.
-2. Move the **Unreleased** notes in `CHANGELOG.md` under the new version.
+2. Move the **Unreleased** notes in `docs/CHANGELOG.md` under the new version.
 3. Build with the stable identity, so macOS keeps the audio permission across updates:
    ```sh
    LIDGLOW_SIGN_IDENTITY="Lidglow Self-Signed" Scripts/package.sh
