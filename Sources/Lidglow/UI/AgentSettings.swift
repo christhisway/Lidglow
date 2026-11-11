@@ -33,6 +33,10 @@ struct AgentsSection: View {
                     Text("Also pulse when an agent finishes")
                     Text("Otherwise only permission prompts and questions pulse the logo.")
                 }
+                Toggle(isOn: $model.agentAlertsWhileOff) {
+                    Text("Pulse even when Lidglow is off")
+                    Text("Takes the logo from macOS for each pulse while the panel's switch is off, then hands it straight back.")
+                }
                 LabeledContent {
                     Slider(value: $model.agentAlertBrightness, in: 0.05...1) { Text("Pulse brightness") }
                         .labelsHidden()
@@ -60,7 +64,10 @@ struct AgentsSection: View {
         guard model.agentAlerts else {
             return "Agents tell Lidglow only that they need you or finished, never what they're working on."
         }
-        return "The pulse stops when you reply to the agent, open the Lidglow panel, or after the time above. It plays only while Lidglow's switch is on, and pauses like any mode when you lock your Mac or close the lid. Agents tell Lidglow only that they need you or finished, never what they're working on."
+        let switchNote = model.agentAlertsWhileOff
+            ? "It plays whether Lidglow's switch is on or off"
+            : "It plays only while Lidglow's switch is on"
+        return "The pulse stops when you reply to the agent, open the Lidglow panel, or after the time above. \(switchNote), and pauses like any mode when you lock your Mac or close the lid. Agents tell Lidglow only that they need you or finished, never what they're working on."
     }
 
     private func alerting(_ agent: CodingAgent) -> Binding<Bool> {

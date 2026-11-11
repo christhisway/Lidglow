@@ -183,6 +183,15 @@ final class GlowModel: ObservableObject {
             }
         }
     }
+    /// Settings → Agents → Pulse even when Lidglow is off. Off by default. When on, a pulse takes the logo
+    /// from macOS while the panel's switch is off, and hands it straight back when the pulse ends, with
+    /// the glow loop stopped in between.
+    @Published var agentAlertsWhileOff = UserDefaults.standard.bool(forKey: "agentAlertsWhileOff") {
+        didSet {
+            UserDefaults.standard.set(agentAlertsWhileOff, forKey: "agentAlertsWhileOff")
+            if !agentAlertsWhileOff && !enabled { clearAgents() }
+        }
+    }
     /// How long a pulse lasts if neither the agent nor opening the panel clears it. Fifteen minutes by default.
     @Published var agentAlertTimeout = (UserDefaults.standard.object(forKey: "agentAlertTimeout") as? Int)
         .flatMap(AgentAlertTimeout.init(rawValue:)) ?? .fifteenMinutes {
@@ -368,18 +377,18 @@ final class GlowModel: ObservableObject {
     }
 
     /// A signal from an agent's hook, through a `lidglow://agent/…` link. It's acted on only while Agent
-    /// alerts and that agent are turned on, and while Lidglow controls the logo. The pulse goes through the
-    /// glow loop and `LidLogo` like any mode, so lock, sleep, lid close, the switch, and quit still hand
-    /// the logo back to macOS mid-pulse.
+    /// alerts and that agent are turned on, and while Lidglow controls the logo or Pulse even when Lidglow
+    /// is off is on. The pulse goes through the glow loop and `LidLogo` like any mode, so lock, sleep, lid
+    /// close, the switch, and quit still hand the logo back to macOS mid-pulse.
     func receive(_ request: AgentRequest) {
         guard agentAlerts, alertingAgents.contains(request.agent) else { return }
         switch request.signal {
         case .clear:
             clear(request.agent)
         case .attention, .done:
-            // Lidglow's switch is off, so the logo belongs to macOS. The panel is open, so the user is
-            // already looking at Lidglow.
-            guard enabled, !panelVisible else { return }
+            // With the switch off the logo belongs to macOS unless the user allowed pulses then. With the
+            // panel open, the user is already looking at Lidglow.
+            guard enabled || agentAlertsWhileOff, !panelVisible else { return }
             if request.signal == .done && !agentAlertsOnFinish { return }
             Logger.agents.notice("\(request.agent.title, privacy: .public) asked for attention (\(request.signal.rawValue, privacy: .public))")
             let now = ProcessInfo.processInfo.systemUptime
@@ -390,7 +399,9 @@ final class GlowModel: ObservableObject {
             // A finished turn doesn't replace a pending prompt from the same agent.
             if waitingAgents[request.agent] != .attention { waitingAgents[request.agent] = request.signal }
             lastAgentSignal = now
-            speedUp()
+            // With the switch off there's no glow loop, so start one just for the pulse. With it on, a
+            // stopped loop is waiting for the user to retry (or for another logo app to quit), so leave it.
+            if enabled { speedUp() } else if timer == nil { start() }
         }
     }
 
@@ -406,14 +417,22 @@ final class GlowModel: ObservableObject {
         pulseEnded()
     }
 
-    /// Hands the logo back to the mode. Music starts its silence clock again rather than counting the
-    /// pulse as silence.
+    /// Hands the logo back to the mode, or to macOS if the switch is off, which also stops the glow loop.
+    /// Music starts its silence clock again rather than counting the pulse as silence.
     private func pulseEnded() {
         pulseStart = nil
         musicHeard = nil
         lastSignal = nil
-        speedUp()
+        if enabled {
+            speedUp()
+        } else {
+            stop()
+            start()
+        }
     }
+
+    /// The glow loop runs while the switch is on, and while the switch is off only for an agent's pulse.
+    private var shouldRun: Bool { enabled || pulseStart != nil }
 
     private var agentStatus: String {
         guard waitingAgents.count == 1, let (agent, signal) = waitingAgents.first else {
@@ -427,7 +446,7 @@ final class GlowModel: ObservableObject {
         audioError = false
         phaseStart = ProcessInfo.processInfo.systemUptime
         hardwareCheck = 0
-        guard enabled else {
+        guard shouldRun else {
             level = 0
             latestLevel = 0
             status = idleStatus
@@ -504,7 +523,7 @@ final class GlowModel: ObservableObject {
     }
 
     private func otherAppsChanged() {
-        guard enabled, hasHardware else { return }
+        guard shouldRun, hasHardware else { return }
         // `stop()` hands the logo back to macOS through the normal restore path before anything else
         // touches it.
         stop()
@@ -538,7 +557,7 @@ final class GlowModel: ObservableObject {
     @objc private func unlockSession() { sessionActive = true; hardwareCheck = 0; speedUp() }
 
     private func tick() {
-        guard enabled else { return }
+        guard shouldRun else { return }
         defer { scheduleNextTick() }
         let now = ProcessInfo.processInfo.systemUptime
         if now >= hardwareCheck {
@@ -549,6 +568,8 @@ final class GlowModel: ObservableObject {
         if pulseStart != nil, let limit = agentAlertTimeout.seconds, now - lastAgentSignal >= limit {
             Logger.agents.notice("Agent alert timed out after \(Int(limit)) s")
             clearAgents()
+            // With the switch off, that stopped the loop and handed the logo back to macOS.
+            guard shouldRun else { return }
         }
         guard displaysAwake && sessionActive && mayRun else {
             pause()
