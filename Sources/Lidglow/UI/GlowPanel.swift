@@ -3,6 +3,7 @@ import SwiftUI
 
 struct GlowPanel: View {
     @ObservedObject var model: GlowModel
+    var openSettings: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack(spacing: 9) {
@@ -12,6 +13,16 @@ struct GlowPanel: View {
                     .foregroundStyle(.primary)
                 Text("Lidglow").font(.headline)
                 Spacer(minLength: 12)
+                Button(action: openSettings) {
+                    Image(systemName: "gearshape")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Settings (⌘,)")
+                .accessibilityLabel("Settings")
                 Toggle("Control the lid logo", isOn: Binding(get: { model.enabled }, set: model.setEnabled))
                     .toggleStyle(.switch)
                     .labelsHidden()

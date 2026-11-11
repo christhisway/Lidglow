@@ -4,7 +4,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 
 ## Current behavior
 
-- Lidglow starts in the menu bar and opens its controls only when the icon is clicked. The panel anchors below the status item, clamps to the active display’s visible frame, and expands down when Music controls appear. It scrolls when vertical space is limited. Control-clicking or right-clicking the icon opens a context menu with Open Settings… and Quit Lidglow. The Settings window has no sections yet.
+- Lidglow starts in the menu bar and opens its controls only when the icon is clicked. The panel anchors below the status item, clamps to the active display’s visible frame, and expands down when Music controls appear. It scrolls when vertical space is limited. Control-clicking or right-clicking the icon opens a context menu with Open Settings… and Quit Lidglow. A gear in the panel header, left of the switch, and ⌘, while the panel is focused also open Settings. The Settings window currently has an About section (version and project links). It closes with ⌘W.
 - A switch in the panel's top-right corner turns Lidglow on or off. Off returns control to macOS (1.0's System mode, which migrates to the switch being off) and is the first-launch default. Modes are Standard, Breathe, and Music. Standard holds a fixed brightness, and zero brightness turns the logo off (this replaced 1.0's separate Off and Steady modes, which migrate to Standard). Breathe has Slow (8 s), Normal (5 s, the default), and Fast (3 s) speeds. Changing speed keeps the current point in the breath. The switch, selected mode, brightness, Breathe speed, Focus preset, sensitivity, and idle glow settings persist.
 - Music uses a private Core Audio process tap to meter system playback, with separate transient detection in bass, drum, mid, and treble bands. The Focus preset (Bass, Vocals, Treble, or Full) weights the bands. Bass is the original bass-and-drum detector and the default. It uses no microphone, stores no recordings, and has no network code.
 - Idle glow sets a base between hits and tracks, capped at 90% of the chosen peak so beats can still brighten the logo. The preview and physical LED both glow white.
@@ -24,7 +24,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | `UI/LaptopPreview.swift` | SceneKit intro and live logo close-up |
 | `UI/LaptopChassis.swift` | Laptop geometry and materials |
 | `UI/MenuPanel.swift` | Borderless key-capable panel |
-| `UI/SettingsWindow.swift` | The Settings window, built on open and released on close |
+| `UI/SettingsWindow.swift` | The Settings window and its About section, built on open and released on close |
 | `Audio/SystemMusic.swift` | Core Audio tap lifecycle |
 | `Audio/BeatMeter.swift` | Band transient detection and the Focus (EQ) presets |
 | `Hardware/LidLogo.swift` | Logo brightness transitions, original state tracking, and restoration |

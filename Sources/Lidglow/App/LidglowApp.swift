@@ -89,7 +89,9 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             return
         }
         if panel == nil {
-            let host = NSHostingController(rootView: GlowPanel(model: model))
+            let host = NSHostingController(rootView: GlowPanel(model: model) { [weak self] in
+                self?.openSettings()
+            })
             host.sizingOptions = []
             let scroll = NSScrollView()
             scroll.drawsBackground = false
@@ -127,6 +129,11 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             guard let self else { return event }
             if event.type == .keyDown {
                 if event.keyCode == 53 { self.closePanel(); return nil }
+                let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                if modifiers == .command && event.charactersIgnoringModifiers == "," {
+                    self.openSettings()
+                    return nil
+                }
             } else if event.window !== self.panel && !self.clickIsOnStatusItem() {
                 self.closePanel()
             }
