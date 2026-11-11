@@ -18,10 +18,9 @@ struct GlowPanel: View {
             // Take the natural height whatever the window's current height, and report it. The host view
             // is always sized to exactly this height, so nothing is centered or clipped while it changes.
             .fixedSize(horizontal: false, vertical: true)
-            .background {
-                GeometryReader { Color.clear.preference(key: PanelHeight.self, value: $0.size.height) }
-            }
-            .onPreferenceChange(PanelHeight.self) { onHeightChange($0) }
+            // A height preference read through a background GeometryReader only reported once in a
+            // hosting controller sized by hand, so use a geometry observer, which fires on every change.
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { onHeightChange($0) }
     }
 
     private var content: some View {
@@ -163,9 +162,4 @@ struct GlowPanel: View {
         .padding(.vertical, 8)
         .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
-}
-
-private struct PanelHeight: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
