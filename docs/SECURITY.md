@@ -17,5 +17,5 @@ Only the latest release on [GitHub Releases](https://github.com/christhisway/Lid
 
 ## Out of scope
 
-- Lidglow has no network code, so it can't be attacked over the network, and it never sends anything anywhere. A report showing otherwise is very much in scope.
+- Lidglow's only network access is **Settings → About → Check for Updates**, which runs only when the user clicks it. It downloads the latest stable release from GitHub Releases over HTTPS and checks its SHA-256 checksum, code signature, and bundle ID before installing it. It never sends anything about the user. A report showing Lidglow connecting anywhere else, or the updater installing something it shouldn't, is very much in scope.
 - A macOS update that stops logo control working is a compatibility bug, not a security problem. Please [open a normal issue](https://github.com/christhisway/Lidglow/issues/new/choose) for it.

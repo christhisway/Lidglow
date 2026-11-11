@@ -11,8 +11,10 @@ cache="$(mktemp -d)"
 module_cache="${LIDGLOW_MODULE_CACHE:-$cache}"
 mkdir -p "$module_cache"
 trap 'rm -rf -- "$cache"' EXIT
-mkdir -p "$destination/Contents/MacOS"
+mkdir -p "$destination/Contents/MacOS" "$destination/Contents/Resources"
 cp "$src/Resources/Info.plist" "$destination/Contents/Info.plist"
+# Settings → About → Check for Updates runs this copy, so the app only runs installer code it shipped with.
+cp Scripts/install.sh "$destination/Contents/Resources/install.sh"
 sdk="$(xcrun --sdk macosx --show-sdk-path)"
 target="$(uname -m)-apple-macos27.0"
 xcrun clang -target "$target" -isysroot "$sdk" -fobjc-arc -O2 \

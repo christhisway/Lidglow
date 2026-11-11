@@ -1,6 +1,6 @@
 # Changelog
 
-Each release is also published on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with these notes. Lidglow doesn't check for updates itself. See [Updating](../README.md#updating).
+Each release is also published on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with these notes. **Settings → About → Check for Updates** installs the latest stable release. See [Updating](../README.md#updating).
 
 ## Unreleased
 
@@ -11,6 +11,7 @@ Each release is also published on [GitHub Releases](https://github.com/christhis
 - A sliding Liquid Glass selector for the modes, and Liquid Glass styling for the panel.
 - An animated laptop preview that shows the live lid glow in your Mac's finish.
 - The Terminal installer takes an optional version, such as `v0.9.0-beta.1`, to install a beta. With no version it installs the latest stable release.
+- **Check for Updates** in Settings → About. It installs the latest stable release from GitHub if it's newer, then reopens Lidglow. It's Lidglow's only network access and runs only when you click it.
 
 ### Changed
 - Off and Steady are now a single Standard mode, whose brightness can go down to off. System mode is now the switch turned off. Saved build 1 settings carry over.
