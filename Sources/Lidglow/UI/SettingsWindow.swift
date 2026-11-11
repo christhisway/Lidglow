@@ -115,7 +115,7 @@ private struct MusicSection: View {
         case .chosenApps:
             return "Music mode reacts only to the apps you choose. Safari plays audio through a shared system process, so choose All apps to follow it."
         case .allApps:
-            return "Music mode reacts to everything your Mac plays, including system sounds, videos, and calls. System sounds such as alerts and volume feedback are ignored."
+            return "Music mode reacts to everything your apps play, including videos and calls. System sounds such as alerts and volume feedback are ignored."
         case .microphone:
             return "Music mode reacts to sound around your Mac. The microphone stays on while Music is running, and macOS shows its indicator. It turns off when you switch modes, lock your Mac, or close the lid. Lidglow never records or saves what it hears. Automatic switching to Music needs Chosen apps or All apps."
         }
