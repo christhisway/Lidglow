@@ -258,11 +258,17 @@ final class GlowModel: ObservableObject {
                 ? "Reacting to system audio" : "Waiting for music · Play something on your Mac"
         }
         if hasHardware {
-            guard logo.takeControl(),
-                  logo.follow(target, now: now, rise: mode == .music ? 0.065 : 0.17,
-                              fall: mode == .music ? 0.15 : 0.22,
-                              tolerance: mode == .music && idleGlow && target == idleBrightness
-                                ? min(0.012, target / 2) : 0.045) else {
+            let following: Bool
+            if mode == .breathe {
+                following = logo.takeControl() && followBreath(now: now)
+            } else {
+                following = logo.takeControl()
+                    && logo.follow(target, now: now, rise: mode == .music ? 0.065 : 0.17,
+                                   fall: mode == .music ? 0.15 : 0.22,
+                                   tolerance: mode == .music && idleGlow && target == idleBrightness
+                                       ? min(0.012, target / 2) : 0.045)
+            }
+            guard following else {
                 stop()
                 publishLevel(0)
                 publishStatus("Couldn’t control the lid logo. Select a mode to retry.")
@@ -271,6 +277,20 @@ final class GlowModel: ObservableObject {
         }
         publishLevel(mode == .music && hasHardware ? logo.measuredLevel : target)
         publishStatus(hasHardware ? label : "Preview · " + label)
+    }
+
+    /// Chasing the moving breath target made the logo fade a little, hold, and fade again, because
+    /// each time it caught up it stopped until the target moved past the tolerance. That stepping was
+    /// worst at Slow. Instead, aim each ramp at the breath's next peak or trough and time it to arrive
+    /// there, so the hardware's own smooth fade carries a whole half-breath.
+    private func followBreath(now: Double) -> Bool {
+        let period = breatheSpeed.period
+        let phase = ((now - phaseStart) / period).truncatingRemainder(dividingBy: 1)
+        let rising = phase < 0.5
+        let extreme = rising ? brightness : brightness * 0.15
+        let remaining = max(0.05, ((rising ? 0.5 : 1) - phase) * period)
+        return logo.follow(extreme, now: now, rise: remaining, fall: remaining, tolerance: 0.03,
+                           maxDuration: period)
     }
 
     private func publishLevel(_ value: Double) {
