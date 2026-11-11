@@ -61,7 +61,10 @@ final class LidLogo {
         holding = false
     }
 
-    func follow(_ target: Double, now: Double, rise: Double, fall: Double, tolerance: Double = 0.045) -> Bool {
+    /// Moves the logo toward `target`, reaching it in about `rise` or `fall` seconds, then holds it there.
+    /// `maxDuration` caps a single ramp. Breathe raises it so one ramp can span a whole slow half-breath.
+    func follow(_ target: Double, now: Double, rise: Double, fall: Double, tolerance: Double = 0.045,
+                maxDuration: Double = 3) -> Bool {
         guard originalMode != nil else { return false }
         if target == settledTarget && now < nextSettledCheck { return true }
         settledTarget = nil
@@ -98,7 +101,7 @@ final class LidLogo {
             let x = 6.51 * midpoint
             if 1 - (1 + x) * exp(-x) < fraction { low = midpoint } else { high = midpoint }
         }
-        let duration = min(3, (rising ? rise : fall) / max(0.05, high))
+        let duration = min(maxDuration, (rising ? rise : fall) / max(0.05, high))
         if rising && level < 0.04 { onRiseFromDark?() }
         return command(rising, duration: duration, hold: false, now: now)
     }

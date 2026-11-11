@@ -5,7 +5,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 ## Current behavior
 
 - Lidglow starts in the menu bar and opens its controls only when the icon is clicked. The panel anchors below the status item, clamps to the active display’s visible frame, and expands down when Music controls appear. It scrolls when vertical space is limited. Control-clicking or right-clicking the icon opens a context menu with Open Settings… and Quit Lidglow. A gear in the panel header, left of the switch, and ⌘, while the panel is focused also open Settings. The Settings window currently has an About section (version and project links). It closes with ⌘W.
-- A switch in the panel's top-right corner turns Lidglow on or off. Off returns control to macOS (1.0's System mode, which migrates to the switch being off) and is the first-launch default. Modes are Standard, Breathe, and Music. Standard holds a fixed brightness, and zero brightness turns the logo off (this replaced 1.0's separate Off and Steady modes, which migrate to Standard). The switch, selected mode, brightness, sensitivity, and idle glow settings persist.
+- A switch in the panel's top-right corner turns Lidglow on or off. Off returns control to macOS (1.0's System mode, which migrates to the switch being off) and is the first-launch default. Modes are Standard, Breathe, and Music. Standard holds a fixed brightness, and zero brightness turns the logo off (this replaced 1.0's separate Off and Steady modes, which migrate to Standard). Breathe has Slow (8 s), Normal (5 s, the default), and Fast (3 s) speeds. Changing speed keeps the current point in the breath. The switch, selected mode, brightness, Breathe speed, sensitivity, and idle glow settings persist.
 - Music uses a private Core Audio process tap to meter system playback, with separate bass and drum transient detection. It uses no microphone, stores no recordings, and has no network code.
 - Idle glow sets a base between hits and tracks, capped at 90% of the chosen peak so beats can still brighten the logo. The preview and physical LED both glow white.
 - Each opening of the panel replays the laptop animation, then switches to a 2D logo that follows the live brightness. Reduce Motion goes directly to the 2D view.
@@ -17,7 +17,7 @@ This package captures Lidglow 1.0 (build 1). Open the extracted folder as a work
 | --- | --- |
 | `App/Main.swift` | Entry point; starts the accessory (menu-bar) app |
 | `App/LidglowApp.swift` | Application delegate: status item and its context menu, panel window, positioning, event monitors, Settings window |
-| `Glow/GlowMode.swift` | The modes and their icons |
+| `Glow/GlowMode.swift` | The modes and their icons, and the Breathe speeds |
 | `Glow/GlowModel.swift` | Mode and settings state, tick loop, session lifecycle |
 | `UI/GlowPanel.swift` | SwiftUI glow controls |
 | `UI/GlassStyle.swift` | Shared Liquid Glass surfaces and the glass mode selector |

@@ -45,6 +45,11 @@ private struct LidLogoCloseup: View {
     private static let logo = LaptopScene.logoTexture.map { Image(decorative: $0, scale: 1) }
         ?? Image(systemName: "apple.logo")
 
+    /// The logo's level is linear light, but SwiftUI opacity blends in gamma-encoded color, so a 15% logo
+    /// looked nearly off in the preview while the real one was clearly lit. Encode the level with the
+    /// display gamma so the preview's brightness matches what the logo emits.
+    private var glow: Double { pow(min(1, max(0, level)), 1 / 2.2) }
+
     var body: some View {
         let shade = LaptopFinish.current == .spaceBlack ? 0.16 : 0.44
         let mark = Self.logo.renderingMode(.template).resizable().scaledToFit()
@@ -61,13 +66,13 @@ private struct LidLogoCloseup: View {
                 .init(color: .white.opacity(0.06), location: 0.63),
                 .init(color: .clear, location: 1)
             ], center: .center, startRadius: 0, endRadius: 80)
-            .opacity(level)
+            .opacity(glow)
             .blendMode(.plusLighter)
             mark.foregroundStyle(.white.opacity(0.14)).offset(y: 0.65)
             mark.foregroundStyle(.linearGradient(colors: [Color(white: 0.14), Color(white: 0.06)],
                                                  startPoint: .top, endPoint: .bottom))
             mark.foregroundStyle(.white)
-                .opacity(level)
+                .opacity(glow)
         }
     }
 }
