@@ -16,6 +16,19 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     private var pendingHeight: CGFloat?
     private var localMonitor: Any?
     private var outsideMonitor: Any?
+    /// On macOS 27 the menu bar tracks the panel the way it tracks a menu (an expanded interface session).
+    /// That's the only way a touch outside the panel closes it: touches elsewhere reach no event monitor
+    /// and don't change key window or active app.
+    private var usesMenuBarSession = false
+    /// When the panel last closed. Touching the icon while the panel is open ends the session, and the same
+    /// touch begins a new one about 75 ms later, which reopened the panel. A session that begins this soon
+    /// after a close is that touch, so it's cancelled and the touch just closes the panel.
+    private var lastClose = Date.distantPast
+    private static let reopenGrace: TimeInterval = 0.25
+    /// The menu bar ignores mouse clicks on the icon while a session is open, so a press on the icon while
+    /// the panel is open closes it on mouse-up. The press that opened the panel doesn't count.
+    private var iconPressedWhileOpen = false
+    private var lastContextMenu = Date.distantPast
     private var settingsWindow: SettingsWindow?
     private var signalSources: [DispatchSourceSignal] = []
     private lazy var contextMenu: NSMenu = {
@@ -44,6 +57,12 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             button.alphaValue = button.alphaValue == 1 ? 0.98 : 1
         }
         setIcon(lit: true)
+        #if compiler(>=6.4)
+        if #available(macOS 27, *) {
+            status.expandedInterfaceDelegate = self
+            usesMenuBarSession = true
+        }
+        #endif
         model.restoreSelectedMode()
     }
 
@@ -61,18 +80,28 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         guard let event = NSApp.currentEvent else { return togglePanel() }
         if event.type == .rightMouseUp || event.modifierFlags.contains(.control) {
             showContextMenu()
-        } else {
+        } else if !usesMenuBarSession {
+            // With the menu bar session, a click begins the session instead, which opens the panel.
             togglePanel()
         }
     }
 
-    private func showContextMenu() {
+    fileprivate func showContextMenu() {
         closePanel()
+        lastContextMenu = Date()
         // Attaching the menu only for this click lets the status item show it with the system's own
-        // highlight and placement, while a normal click still toggles the panel.
+        // highlight and placement, while a normal click still toggles the panel. The click would also
+        // begin a menu bar session and open the panel over the menu, so detach the delegate meanwhile.
+        // `performClick` returns once the menu closes.
+        #if compiler(>=6.4)
+        if #available(macOS 27, *), usesMenuBarSession { item?.expandedInterfaceDelegate = nil }
+        #endif
         item?.menu = contextMenu
         item?.button?.performClick(nil)
         item?.menu = nil
+        #if compiler(>=6.4)
+        if #available(macOS 27, *), usesMenuBarSession { item?.expandedInterfaceDelegate = self }
+        #endif
     }
 
     @objc private func openSettings() {
@@ -84,6 +113,8 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         NSApp.activate()
         settingsWindow?.makeKeyAndOrderFront(nil)
     }
+
+    fileprivate var isPanelVisible: Bool { panel?.isVisible == true }
 
     private func togglePanel() {
         if panel?.isVisible == true {
@@ -143,7 +174,8 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         model.panelVisible = true
         guard positionPanel(), let panel else { model.panelVisible = false; return }
         panel.makeKeyAndOrderFront(nil)
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) {
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .leftMouseUp,
+                                                                  .rightMouseDown]) {
             [weak self] event in
             guard let self else { return event }
             if event.type == .keyDown {
@@ -153,16 +185,31 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
                     self.openSettings()
                     return nil
                 }
-            } else if event.window !== self.panel && !self.clickIsOnStatusItem() {
+            } else if !self.handledIconClick(event) && event.window !== self.panel && event.type != .leftMouseUp {
                 self.closePanel()
             }
             return event
         }
-        outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) {
-            [weak self] _ in
-            guard let self, !self.clickIsOnStatusItem() else { return }
+        outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp, .rightMouseDown]) {
+            [weak self] event in
+            guard let self, !self.handledIconClick(event), event.type != .leftMouseUp else { return }
             self.closePanel()
         }
+    }
+
+    /// Whether a click is on the menu-bar icon, which the monitors leave alone. Without the menu bar session
+    /// the button's action toggles the panel. With it, the menu bar ignores mouse clicks on the icon while
+    /// the panel is open, so a press there closes the panel on mouse-up.
+    private func handledIconClick(_ event: NSEvent) -> Bool {
+        guard clickIsOnStatusItem() else { return false }
+        if usesMenuBarSession {
+            if event.type == .leftMouseDown {
+                iconPressedWhileOpen = true
+            } else if event.type == .leftMouseUp && iconPressedWhileOpen {
+                closePanel()
+            }
+        }
+        return true
     }
 
     /// Clicks on the menu-bar icon belong to `statusItemClicked()`. If a monitor closed the panel on mouse-down,
@@ -214,7 +261,16 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         return true
     }
 
-    private func closePanel() {
+    fileprivate func closePanel() {
+        if panel?.isVisible == true { lastClose = Date() }
+        iconPressedWhileOpen = false
+        #if compiler(>=6.4)
+        // Closing for any other reason (Escape, a click outside, Settings) ends the menu bar session too.
+        // Cancel after this returns, since cancelling calls back into the delegate.
+        if #available(macOS 27, *), let session = item?.expandedInterfaceSession {
+            DispatchQueue.main.async { session.cancel() }
+        }
+        #endif
         panel?.orderOut(nil)
         model.panelVisible = false
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
@@ -242,3 +298,32 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         }
     }
 }
+
+#if compiler(>=6.4)
+@available(macOS 27, *)
+extension LidglowApp: NSStatusItemExpandedInterfaceDelegate {
+    func statusItem(_ statusItem: NSStatusItem,
+                    didBegin expandedInterfaceSession: NSStatusItemExpandedInterfaceSession) {
+        if let event = NSApp.currentEvent,
+           event.type == .rightMouseDown || event.type == .rightMouseUp || event.modifierFlags.contains(.control) {
+            // The context menu belongs to `statusItemClicked()`. Show it from here only if a Control-click
+            // reached the session but not the button.
+            expandedInterfaceSession.cancel()
+            if Date().timeIntervalSince(lastContextMenu) > 0.5 {
+                DispatchQueue.main.async { [weak self] in self?.showContextMenu() }
+            }
+            return
+        }
+        // The same touch on the icon that just closed the panel.
+        if Date().timeIntervalSince(lastClose) < Self.reopenGrace {
+            expandedInterfaceSession.cancel()
+            return
+        }
+        if !isPanelVisible { togglePanel() }
+    }
+
+    func statusItemDidEndExpandedInterfaceSession(_ statusItem: NSStatusItem, animated: Bool) {
+        if isPanelVisible { closePanel() }
+    }
+}
+#endif
