@@ -84,7 +84,7 @@ private struct MusicSection: View {
                 ForEach(MusicTimeout.allCases) { Text($0.title).tag($0) }
             } label: {
                 Text("Switch back after silence")
-                Text("Returns to the mode you used before Music once nothing has played for this long.")
+                Text(switchBackExplainer)
             }
             if model.microphoneDenied {
                 LabeledContent {
@@ -115,6 +115,19 @@ private struct MusicSection: View {
             return "Music mode reacts to everything your Mac plays, including system sounds, videos, and calls. Automatic switching to Music needs Chosen apps."
         case .microphone:
             return "Music mode reacts to sound around your Mac. The microphone stays on while Music is running, and macOS shows its indicator. It turns off when you switch modes, lock your Mac, or close the lid. Lidglow never records or saves what it hears. Automatic switching to Music needs Chosen apps."
+        }
+    }
+
+    private var switchBackExplainer: String {
+        switch model.musicTimeout {
+        case .automatic where model.musicSource == .chosenApps:
+            return "Returns to the mode you used before Music when the audio stream from all chosen apps stops."
+        case .automatic:
+            return "Automatically follows the chosen apps, so with this source Music returns to your previous mode after 10 seconds of silence."
+        case .never:
+            return "Music stays on until you pick another mode."
+        default:
+            return "Returns to the mode you used before Music once nothing has played for this long."
         }
     }
 

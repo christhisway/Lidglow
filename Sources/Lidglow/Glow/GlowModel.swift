@@ -118,6 +118,7 @@ final class GlowModel: ObservableObject {
             UserDefaults.standard.set(musicTimeout.rawValue, forKey: "musicTimeout")
             // Count the new limit from now, not from the last sound.
             musicHeard = nil
+            updatePlaybackWatch()
         }
     }
 
@@ -247,23 +248,36 @@ final class GlowModel: ObservableObject {
         updatePlaybackWatch()
     }
 
-    /// Watches the chosen apps only while automatic switching can act on them.
+    /// Seconds of silence before Music switches back, or nil when it doesn't count silence. Automatically
+    /// follows the chosen apps, so with All apps or Microphone it falls back to ten seconds of silence.
+    private var silenceLimit: Double? {
+        if musicTimeout == .automatic { return musicSource == .chosenApps ? nil : 10 }
+        return musicTimeout.seconds
+    }
+
+    /// Watches the chosen apps only while switching into or out of Music can act on them.
     private func updatePlaybackWatch() {
         playback.bundleIDs = Set(musicApps)
-        if autoMusic && enabled && musicSource == .chosenApps {
+        if (autoMusic || musicTimeout == .automatic) && enabled && musicSource == .chosenApps {
             playback.start()
         } else {
             playback.stop()
         }
     }
 
-    /// A chosen app started playing. Switching happens only when playback starts, so a mode picked by hand
-    /// while music plays stays until playback stops and starts again. Stopping doesn't switch back: the
-    /// silence timeout does that.
+    /// A chosen app started playing, or every chosen app stopped. Switching in happens only when playback
+    /// starts, so a mode picked by hand while music plays stays until playback stops and starts again.
+    /// Switching out on stop happens only with Switch back after silence set to Automatically.
     private func playbackChanged(_ playing: Bool) {
-        guard playing, enabled, mode != .music else { return }
-        Logger.audio.notice("Switching to Music automatically")
-        select(.music)
+        guard enabled else { return }
+        if playing {
+            guard autoMusic, mode != .music else { return }
+            Logger.audio.notice("Switching to Music automatically")
+            select(.music)
+        } else if musicTimeout == .automatic && mode == .music {
+            Logger.audio.notice("Leaving Music because the chosen apps stopped playing")
+            leaveMusic()
+        }
     }
 
     private func start() {
@@ -369,7 +383,6 @@ final class GlowModel: ObservableObject {
         guard mode == .music else { return }
         let previous = UserDefaults.standard.string(forKey: Self.modeBeforeMusicKey)
             .flatMap(GlowMode.init(rawValue:)).flatMap { $0 == .music ? nil : $0 } ?? .standard
-        Logger.audio.notice("Leaving Music after \(self.musicTimeout.rawValue) s of silence")
         select(previous)
     }
 
@@ -412,11 +425,12 @@ final class GlowModel: ObservableObject {
         case .music:
             let signal = music.level(at: now)
             if signal > SystemMusic.soundThreshold { lastSignal = now }
-            if let limit = musicTimeout.seconds {
+            if let limit = silenceLimit {
                 if signal > SystemMusic.soundThreshold || musicHeard == nil {
                     musicHeard = now
                 } else if let heard = musicHeard, now - heard >= limit {
                     // Switch modes after this tick finishes, rather than restarting the loop inside it.
+                    Logger.audio.notice("Leaving Music after \(Int(limit)) s of silence")
                     DispatchQueue.main.async { [weak self] in self?.leaveMusic() }
                 }
             }
