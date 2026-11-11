@@ -2,6 +2,11 @@
 
 Each release is also published on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with these notes. **Settings → About → Check for Updates** installs the latest stable release. See [Install](../README.md#install).
 
+## Unreleased
+
+### Added
+- Agent alerts in Settings → Agents (off by default): the logo pulses over any mode when Claude Code or Codex needs your input or finishes, until you reply, open the panel, or it times out. Agents signal Lidglow through hooks you paste into their config, with a `lidglow://` link and no network access.
+
 ## 0.9.0 Beta 1
 
 ### Added

@@ -57,12 +57,13 @@ If Lidglow crashes or is force quit and the logo stays dim, dark, or stuck at on
 - **Breathe** fades it slowly up and down. Speed can be chosen from three presets.
 - **Music** pulses with the beat from a configured list of apps (default Spotify and Apple Music), all apps, or the microphone (requires Microphone access).
   - Lidglow supports **automatic mode switching**, which turns on Music mode automatically when an allowed app is detected as playing audio, and immediately reverts back to the last selected mode when this audio stops (or after a set length of silence). This is off by default and can be enabled in Settings.
+- **Agent alerts** pulse the logo when a coding agent needs you: Claude Code or Codex waiting on a permission prompt or a question, or finishing a turn. It works over any mode and stops when you reply, open the panel, or after a timeout. This is off by default. Turn it on in **Settings → Agents**, where **Set Up…** shows the hooks to paste into each agent's config.
 - Hands the logo back to macOS when you lock, sleep, close the lid, or quit, and repairs it after a crash.
 - Optional Open at Login, configurable in settings.
 
 ## Privacy
 
-Lidglow records nothing and sends nothing. Audio is reduced to a brightness level as it plays and discarded. Its only network access is **Check for Updates**, which runs only when you click it. See the full [privacy statement](docs/PRIVACY.md).
+Lidglow records nothing and sends nothing. Agent alerts receive only an agent's name and whether it needs you, through a local link rather than the network. Audio is reduced to a brightness level as it plays and discarded. Its only network access is **Check for Updates**, which runs only when you click it. See the full [privacy statement](docs/PRIVACY.md).
 
 ## Contributing
 
