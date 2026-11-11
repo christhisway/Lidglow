@@ -18,7 +18,7 @@ Thanks for helping. Lidglow is a small, free project, so the process is light.
 
 These keep Lidglow safe to leave running all day. Pull requests that break them won't be merged.
 
-- **Privacy:** no network code, telemetry, recording, or new uses of the microphone. Audio is reduced to a level and discarded. See [PRIVACY.md](PRIVACY.md).
+- **Privacy:** no network access beyond the user-started Check for Updates, and no telemetry, recording, or new uses of the microphone. Audio is reduced to a level and discarded. See [PRIVACY.md](PRIVACY.md).
 - **Energy:** keep the tick timer only as fast as each mode needs, avoid redundant hardware reads and redraws, and use events or notifications instead of polling.
 - **Hardware safety:** keep hardware detection and the hand-back to macOS (switch off, quit, lock, sleep, lid close) working on every change to `Hardware/` or `Glow/`.
 - **Docs:** when you add, move, or rename a source file, update the layout in `README.md` and the source map in `docs/HANDOFF.md`.

@@ -79,17 +79,19 @@ Audio processing runs locally through a private Core Audio tap. The app reduces 
 
 ## Updating
 
-Lidglow never checks for updates itself, because it has no network code. New versions are posted on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with release notes, also kept in [CHANGELOG.md](docs/CHANGELOG.md). To be notified, click **Watch → Custom → Releases** on the repository page. **Settings → About → View Releases** opens the page in your browser.
+New versions are posted on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with release notes, also kept in [CHANGELOG.md](docs/CHANGELOG.md). Lidglow never checks for updates on its own. To be notified, click **Watch → Custom → Releases** on the repository page. **Settings → About → View Releases** opens the page in your browser.
+
+**Settings → About → Check for Updates** installs the latest stable release if it's newer than yours. It verifies the download the same way the install command does, quits Lidglow normally so the logo goes back to macOS, replaces the app, and reopens it. If you're already up to date, or there's no stable release yet, it says so and changes nothing. It only offers stable releases, so to move to a newer beta, use the install command with that beta's version. It can't update a copy of Lidglow in a folder you can't write to.
 
 To update, run the [install command](#install) again, adding the new version if you're on a beta. It quits Lidglow normally so it hands the logo back to macOS, then replaces the app and opens it. If you installed by hand, quit Lidglow from the panel or its Control-click menu, then replace `Lidglow.app` with the new version and open it. An ad-hoc signed build may ask for System Audio Recording or Microphone permission again after an update.
 
 ## Privacy
 
-Lidglow records nothing and has no network code. Music mode reduces your Mac's audio output to a brightness level as it plays and then discards it. It uses the microphone only if you choose **Microphone** as Music's source, and only while Music is running. Settings are stored only in macOS preferences. Read the full [privacy statement](docs/PRIVACY.md).
+Lidglow records nothing, and its only network access is **Check for Updates**, which runs only when you click it. Music mode reduces your Mac's audio output to a brightness level as it plays and then discards it. It uses the microphone only if you choose **Microphone** as Music's source, and only while Music is running. Settings are stored only in macOS preferences. Read the full [privacy statement](docs/PRIVACY.md).
 
 ## Reporting bugs
 
-Lidglow has no network code, so it never sends crash reports or diagnostics anywhere. To report a problem, [open an issue](https://github.com/christhisway/Lidglow/issues/new/choose) and include what you can of the following:
+Lidglow never sends crash reports or diagnostics anywhere. To report a problem, [open an issue](https://github.com/christhisway/Lidglow/issues/new/choose) and include what you can of the following:
 
 - **Crash reports:** open the Console app and choose **Crash Reports**, or look in `~/Library/Logs/DiagnosticReports/` for files whose names start with `Lidglow`.
 - **Recent logs:** run this in Terminal shortly after the problem happens:
@@ -104,14 +106,14 @@ Lidglow has no network code, so it never sends crash reports or diagnostics anyw
 
 ```
 Sources/Lidglow/
-  App/        Entry point, application delegate (status item, panel window), and local log categories
+  App/        Entry point, application delegate (status item, panel window), local log categories, and the Check for Updates runner
   Glow/       Glow modes and the model that drives the logo each tick
   UI/         SwiftUI controls, shared Liquid Glass styling, the borderless menu panel, the Settings window, and the animated laptop preview
   Audio/      Core Audio process tap, the playback watcher for automatic switching to Music, and the BeatMeter detector
   Hardware/   Lid logo control, detection of other apps controlling the logo, laptop finish detection, and the Objective-C CoreBrightness bridge
   Resources/  Info.plist and the entitlements used for Developer ID (hardened-runtime) signing
 Tests/BeatMeterTests/  Synthetic beat detector check
-Scripts/      build.sh, test.sh, package.sh (release zip and checksum), install.sh (the Terminal installer), and uninstall.sh
+Scripts/      build.sh, test.sh, package.sh (release zip and checksum), install.sh (the Terminal installer, also bundled in the app for Check for Updates), and uninstall.sh
 docs/         Handoff notes, the end-user install guide, the release checklist, the changelog, and the contributing, security, and privacy notes
 .github/      Issue templates and the Release workflow, which builds a draft release from main when started by hand
 ```
