@@ -253,9 +253,15 @@ final class GlowModel: ObservableObject {
     private let music = SystemMusic()
     private let otherApps = OtherLogoApps()
     private let playback = PlaybackWatcher()
+    private let power = PowerSource()
     private var timer: Timer?
     private var phaseStart = 0.0
+    /// False while another user's session is in front (fast user switching), which always hands the logo
+    /// back to macOS.
     private var sessionActive = true
+    /// The screen is locked. That hands the logo back to macOS too, unless the battery is charging: then
+    /// the logo keeps breathing, and nothing else (Music's input, an agent's pulse) runs until unlock.
+    private var screenLocked = false
     private var displaysAwake = true
     private var hardwareCheck = 0.0
     private var mayRun = true
@@ -295,8 +301,8 @@ final class GlowModel: ObservableObject {
             NSWorkspace.shared.notificationCenter.addObserver(self, selector: action, name: event, object: nil)
         }
         let distributed = DistributedNotificationCenter.default()
-        distributed.addObserver(self, selector: #selector(lockSession), name: .init("com.apple.screenIsLocked"), object: nil)
-        distributed.addObserver(self, selector: #selector(unlockSession), name: .init("com.apple.screenIsUnlocked"), object: nil)
+        distributed.addObserver(self, selector: #selector(lockScreen), name: .init("com.apple.screenIsLocked"), object: nil)
+        distributed.addObserver(self, selector: #selector(unlockScreen), name: .init("com.apple.screenIsUnlocked"), object: nil)
         music.onSound = { [weak self] in self?.speedUp() }
         music.source = musicInput
         music.onFailure = { [weak self] error in
@@ -310,6 +316,7 @@ final class GlowModel: ObservableObject {
         otherApps.onChange = { [weak self] in self?.otherAppsChanged() }
         playback.onChange = { [weak self] playing in self?.playbackChanged(playing) }
         clickWatcher.onClick = { [weak self] app in self?.clicked(in: app) }
+        power.onChange = { [weak self] _ in self?.chargingChanged() }
     }
 
     /// The logo can be controlled: the hardware is there and the private CoreBrightness interface looks
@@ -359,8 +366,44 @@ final class GlowModel: ObservableObject {
         if !on { stop(); clearAgents() }
         enabled = on
         UserDefaults.standard.set(on, forKey: Self.enabledKey)
+        updatePowerWatch()
         start()
         updatePlaybackWatch()
+    }
+
+    /// Settings → General → Breathe while charging. On by default. Off, charging never changes the glow
+    /// and the power source isn't watched.
+    @Published var breatheWhileCharging = UserDefaults.standard.object(forKey: "breatheWhileCharging") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(breatheWhileCharging, forKey: "breatheWhileCharging")
+            updatePowerWatch()
+            // Hand the glow back to the mode (or, if locked, to macOS) on the next tick, or start the breath.
+            chargingChanged()
+        }
+    }
+
+    /// Charging only changes the glow while Lidglow is on and Breathe while charging is on, so the power
+    /// source is watched only then.
+    private func updatePowerWatch() {
+        if enabled && breatheWhileCharging { power.start() } else { power.stop() }
+    }
+
+    /// While the battery charges, every mode breathes, except Music while music is playing. Plugged in
+    /// with a full battery isn't charging, so the selected mode shows as usual.
+    private var chargingBreath: Bool { enabled && breatheWhileCharging && power.isCharging }
+    private static let chargingLabel = "Breathing (Charging)"
+
+    /// Music counts as quiet once nothing above the threshold has played for `silenceDelay`.
+    private func musicQuiet(at now: Double) -> Bool {
+        lastSignal.map { now - $0 >= Self.silenceDelay } ?? true
+    }
+
+    private func chargingChanged() {
+        updateIcon()
+        // Start a borrowed breath from its trough, as Breathe does when it's selected, so it doesn't open
+        // partway through a fade.
+        if chargingBreath && mode != .breathe { phaseStart = ProcessInfo.processInfo.systemUptime }
+        speedUp()
     }
 
     /// Seconds of silence before Music switches back, or nil when it doesn't count silence. Automatically
@@ -515,7 +558,7 @@ final class GlowModel: ObservableObject {
     /// call this on every change, so only touch the status item when the icon actually flips.
     private var iconLit: Bool?
     private func updateIcon() {
-        let lit = !enabled || brightness > 0
+        let lit = !enabled || brightness > 0 || chargingBreath
         guard lit != iconLit else { return }
         iconLit = lit
         onIconChange?(lit)
@@ -540,25 +583,33 @@ final class GlowModel: ObservableObject {
     private func scheduleNextTick() {
         guard let timer else { return }
         let interval: Double
-        if !(displaysAwake && sessionActive && mayRun) {
+        if !(displaysAwake && sessionActive && mayRun) || (screenLocked && !chargingBreath) {
             interval = Self.idleTick
-        } else if pulseStart != nil {
+        } else if screenLocked || pulseStart != nil {
             interval = Self.breatheTick
         } else if mode == .music && audioError {
             interval = Self.idleTick
         } else {
             switch mode {
             case .music:
-                let now = ProcessInfo.processInfo.systemUptime
-                let silent = lastSignal.map { now - $0 >= Self.silenceDelay } ?? true
-                if silent && (!hasHardware || logo.isSettled) {
+                let silent = musicQuiet(at: ProcessInfo.processInfo.systemUptime)
+                if silent && chargingBreath {
+                    // Breathing while charging. Each tick still reads the level, so music takes over as
+                    // soon as it starts.
+                    interval = Self.breatheTick
+                } else if silent && (!hasHardware || logo.isSettled) {
                     music.armWake()
                     interval = Self.idleTick
                 } else {
                     interval = Self.fastTick
                 }
             case .breathe: interval = Self.breatheTick
-            case .standard: interval = !hasHardware || logo.isSettled ? Self.idleTick : Self.fastTick
+            case .standard:
+                if chargingBreath {
+                    interval = Self.breatheTick
+                } else {
+                    interval = !hasHardware || logo.isSettled ? Self.idleTick : Self.fastTick
+                }
             }
         }
         if abs(timer.timeInterval - interval) > 1e-6 { schedule(interval) }
@@ -602,6 +653,12 @@ final class GlowModel: ObservableObject {
     @objc private func screenWake() { displaysAwake = true; hardwareCheck = 0; speedUp() }
     @objc private func lockSession() { sessionActive = false; pause() }
     @objc private func unlockSession() { sessionActive = true; hardwareCheck = 0; speedUp() }
+    @objc private func lockScreen() {
+        screenLocked = true
+        // While charging, the next tick switches to the locked breath. Otherwise hand the logo back now.
+        if chargingBreath { speedUp() } else { pause() }
+    }
+    @objc private func unlockScreen() { screenLocked = false; hardwareCheck = 0; speedUp() }
 
     private func tick() {
         guard shouldRun else { return }
@@ -618,10 +675,22 @@ final class GlowModel: ObservableObject {
             // With the switch off, that stopped the loop and handed the logo back to macOS.
             guard shouldRun else { return }
         }
-        guard displaysAwake && sessionActive && mayRun else {
+        guard displaysAwake && sessionActive && mayRun && (!screenLocked || chargingBreath) else {
             pause()
             publishLevel(0)
             publishStatus("Paused while the lid or screen is inactive")
+            return
+        }
+        // Locked while charging: only the charging breath shows, whatever the mode. Music's input stays off,
+        // as it does whenever the screen is locked, and a waiting agent's pulse shows after unlock. Unplugging,
+        // display sleep, and lid close all reach the pause above on a later tick.
+        if screenLocked {
+            if music.started { music.stop() }
+            lastSignal = nil
+            musicHeard = nil
+            if hasHardware { guard driveLogo({ followBreath(now: now) }) else { return } }
+            publishLevel(breathTarget(now: now))
+            publishStatus(hasHardware ? Self.chargingLabel : "Preview · " + Self.chargingLabel)
             return
         }
         // An agent is waiting: the pulse takes over from the mode until it's cleared. Music's input keeps
@@ -647,12 +716,12 @@ final class GlowModel: ObservableObject {
             }
         }
         if mode == .music && audioError { return }
-        let target: Double
-        let label: String
+        var target: Double
+        var label: String
         switch mode {
         case .standard: target = brightness; label = brightness > 0 ? "Standard glow" : "Lid logo off"
         case .breathe:
-            target = brightness * (0.15 + 0.85 * (1 - cos((now - phaseStart) * 2 * .pi / breatheSpeed.period)) / 2)
+            target = breathTarget(now: now)
             label = "Breathing"
         case .music:
             let signal = music.level(at: now)
@@ -684,9 +753,15 @@ final class GlowModel: ObservableObject {
                 label = "Waiting for music · Play something on your Mac"
             }
         }
+        // While charging, Standard and a quiet Music borrow Breathe's breath, at Breathe's brightness and
+        // speed. Music keeps sampling above, so playback takes over again on the next tick that hears it.
+        let breathing = mode == .breathe || (chargingBreath && (mode != .music || musicQuiet(at: now)))
+        if breathing && mode != .breathe { target = breathTarget(now: now) }
+        // Breathe looks the same either way, but the status still says the breath comes from charging.
+        if breathing && chargingBreath { label = Self.chargingLabel }
         if hasHardware {
             let driven: Bool
-            if mode == .breathe {
+            if breathing {
                 driven = driveLogo { followBreath(now: now) }
             } else {
                 driven = driveLogo {
@@ -698,7 +773,7 @@ final class GlowModel: ObservableObject {
             }
             guard driven else { return }
         }
-        publishLevel(mode == .music && hasHardware ? logo.measuredLevel : target)
+        publishLevel(mode == .music && !breathing && hasHardware ? logo.measuredLevel : target)
         publishStatus(hasHardware ? label : "Preview · " + label)
     }
 
@@ -720,6 +795,12 @@ final class GlowModel: ObservableObject {
         return true
     }
 
+    /// Where the breath is now, for the preview, at Breathe's brightness whichever mode borrows it.
+    private func breathTarget(now: Double) -> Double {
+        brightness(for: .breathe)
+            * (0.15 + 0.85 * (1 - cos((now - phaseStart) * 2 * .pi / breatheSpeed.period)) / 2)
+    }
+
     /// Chasing the moving breath target made the logo fade a little, hold, and fade again, because
     /// each time it caught up it stopped until the target moved past the tolerance. That stepping was
     /// worst at Slow. Instead, aim each ramp at the breath's next peak or trough and time it to arrive
@@ -728,7 +809,8 @@ final class GlowModel: ObservableObject {
         let period = breatheSpeed.period
         let phase = ((now - phaseStart) / period).truncatingRemainder(dividingBy: 1)
         let rising = phase < 0.5
-        let extreme = rising ? brightness : brightness * 0.15
+        let peak = brightness(for: .breathe)
+        let extreme = rising ? peak : peak * 0.15
         let remaining = max(0.05, ((rising ? 0.5 : 1) - phase) * period)
         return logo.follow(extreme, now: now, rise: remaining, fall: remaining, tolerance: 0.03,
                            maxDuration: period)

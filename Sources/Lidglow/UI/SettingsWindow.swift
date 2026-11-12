@@ -43,7 +43,7 @@ private struct SettingsView: View {
 
     var body: some View {
         Form {
-            GeneralSection()
+            GeneralSection(model: model)
             MusicSection(model: model)
             AgentsSection(model: model)
             AboutSection()
@@ -236,8 +236,10 @@ private struct MusicApp: Identifiable {
     }
 }
 
-/// Open at Login, through the system's login item service for the app itself (macOS 13 and later).
+/// Open at Login, through the system's login item service for the app itself (macOS 13 and later), and
+/// Breathe while charging.
 private struct GeneralSection: View {
+    @ObservedObject var model: GlowModel
     @State private var status = SMAppService.mainApp.status
     @State private var failure: String?
 
@@ -255,6 +257,10 @@ private struct GeneralSection: View {
             }
             if let failure {
                 Text(failure).font(.footnote).foregroundStyle(.secondary)
+            }
+            Toggle(isOn: $model.breatheWhileCharging) {
+                Text("Breathe while charging")
+                Text("Every mode breathes while the battery charges, except Music while music plays.")
             }
         }
         // Approval happens in System Settings, so check again when the user comes back.
