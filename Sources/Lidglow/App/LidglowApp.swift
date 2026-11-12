@@ -84,6 +84,21 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         false
     }
 
+    /// Agent hooks run `open -g "lidglow://agent/attention?agent=claude-code"`, which arrives here without
+    /// bringing Lidglow to the front. It's the only way in: no network listener. Any app can open these
+    /// links, so `AgentRequest` accepts only known signals and agents. Anything else is dropped, and its contents aren't logged.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        // With no light-up logo there's nothing to pulse, so the links are dropped unread.
+        guard let model else { return }
+        for url in urls {
+            guard let request = AgentRequest(url: url) else {
+                Logger.agents.notice("Ignored a link that isn't a known agent signal")
+                continue
+            }
+            model.receive(request)
+        }
+    }
+
     private func setIcon(lit: Bool) {
         item?.button?.image = NSImage(systemSymbolName: lit ? "waveform.circle" : "circle",
                                       accessibilityDescription: "Lidglow")

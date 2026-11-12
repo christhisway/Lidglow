@@ -45,6 +45,7 @@ private struct SettingsView: View {
         Form {
             GeneralSection()
             MusicSection(model: model)
+            AgentsSection(model: model)
             AboutSection()
         }
         .formStyle(.grouped)
@@ -273,7 +274,7 @@ private struct GeneralSection: View {
     }
 }
 
-/// Lidglow has no network code, so these links only open pages in the user's browser.
+/// These links open pages in the user's browser. Lidglow itself never loads them.
 enum ProjectLinks {
     static let repository = URL(string: "https://github.com/christhisway/Lidglow")!
     static let readme = URL(string: "https://github.com/christhisway/Lidglow#readme")!
@@ -282,6 +283,31 @@ enum ProjectLinks {
 }
 
 private struct AboutSection: View {
+    @ObservedObject private var updater = Updater.shared
+
+    private var isBeta: Bool {
+        !((Bundle.main.infoDictionary?["LidglowReleaseLabel"] as? String) ?? "").isEmpty
+    }
+
+    private var updateStatus: String {
+        switch updater.state {
+        case .idle:
+            return "Installs the latest stable release from GitHub if it’s newer, then reopens Lidglow. Lidglow only connects when you click."
+        case .checking:
+            return "Checking GitHub for a newer stable release…"
+        case .upToDate where isBeta:
+            return "There’s no newer stable release. Newer betas are listed under View Releases."
+        case .upToDate:
+            return "Lidglow is up to date."
+        case .noStableRelease:
+            return "There’s no stable release yet. Betas are listed under View Releases."
+        case .installing:
+            return "Installing the update. Lidglow will quit and reopen."
+        case .failed(let reason):
+            return reason
+        }
+    }
+
     private var version: String {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "?"
@@ -310,11 +336,18 @@ private struct AboutSection: View {
                 }
             }
             LabeledContent {
-                Link("View Releases", destination: ProjectLinks.releases)
+                HStack(spacing: 8) {
+                    if updater.isBusy {
+                        ProgressView().controlSize(.small)
+                    }
+                    Button("Check for Updates") { updater.check() }
+                        .disabled(updater.isBusy)
+                }
             } label: {
                 Text("Updates")
-                Text("Lidglow doesn’t check for updates itself. New versions are posted on GitHub.")
+                Text(updateStatus)
             }
+            Link("View Releases", destination: ProjectLinks.releases)
             Link("Read Me", destination: ProjectLinks.readme)
             Link("Source Code on GitHub", destination: ProjectLinks.repository)
             LabeledContent {

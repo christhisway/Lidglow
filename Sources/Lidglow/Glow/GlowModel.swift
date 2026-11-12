@@ -159,6 +159,80 @@ final class GlowModel: ObservableObject {
         }
     }
 
+    /// Settings → Agents → Pulse when an agent needs you. Off by default. While it's off, every agent link
+    /// is ignored.
+    @Published var agentAlerts = UserDefaults.standard.bool(forKey: "agentAlerts") {
+        didSet {
+            UserDefaults.standard.set(agentAlerts, forKey: "agentAlerts")
+            if !agentAlerts { clearAgents() }
+        }
+    }
+    /// The agents whose links Lidglow acts on. All of them by default, once Agent alerts is on.
+    @Published var alertingAgents = Set((UserDefaults.standard.stringArray(forKey: "agentAlertAgents")
+        ?? CodingAgent.allCases.map(\.rawValue)).compactMap(CodingAgent.init(rawValue:))) {
+        didSet {
+            UserDefaults.standard.set(CodingAgent.allCases.filter(alertingAgents.contains).map(\.rawValue),
+                                      forKey: "agentAlertAgents")
+            for agent in waitingAgents.keys where !alertingAgents.contains(agent) { clear(agent) }
+        }
+    }
+    /// Also pulse when an agent finishes a turn, not only when it's waiting on a prompt. On by default.
+    @Published var agentAlertsOnFinish = UserDefaults.standard.object(forKey: "agentAlertsOnFinish") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(agentAlertsOnFinish, forKey: "agentAlertsOnFinish")
+            if !agentAlertsOnFinish {
+                for (agent, waiting) in waitingAgents where waiting.signal == .done { clear(agent) }
+            }
+        }
+    }
+    /// Settings → Agents → Pulse even when Lidglow is off. Off by default. When on, a pulse takes the logo
+    /// from macOS while the panel's switch is off, and hands it straight back when the pulse ends, with
+    /// the glow loop stopped in between.
+    @Published var agentAlertsWhileOff = UserDefaults.standard.bool(forKey: "agentAlertsWhileOff") {
+        didSet {
+            UserDefaults.standard.set(agentAlertsWhileOff, forKey: "agentAlertsWhileOff")
+            if !agentAlertsWhileOff && !enabled { clearAgents() }
+        }
+    }
+    /// How long a pulse lasts if neither the agent nor opening the panel clears it. Fifteen minutes by default.
+    @Published var agentAlertTimeout = (UserDefaults.standard.object(forKey: "agentAlertTimeout") as? Int)
+        .flatMap(AgentAlertTimeout.init(rawValue:)) ?? .fifteenMinutes {
+        didSet { UserDefaults.standard.set(agentAlertTimeout.rawValue, forKey: "agentAlertTimeout") }
+    }
+    /// The pulse's own peak, separate from the modes' brightness, so an alert shows even while Standard
+    /// holds the logo off. Full by default.
+    @Published var agentAlertBrightness = min(1, max(0.05, UserDefaults.standard.object(forKey: "agentAlertBrightness")
+        as? Double ?? 1)) {
+        didSet { UserDefaults.standard.set(agentAlertBrightness, forKey: "agentAlertBrightness") }
+    }
+    /// Settings → Agents → Stop pulsing when I click in the agent's app. On by default. Clicks are watched
+    /// only while an agent that named its app is waiting.
+    @Published var agentAlertsClearOnClick = UserDefaults.standard.object(forKey: "agentAlertsClearOnClick") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(agentAlertsClearOnClick, forKey: "agentAlertsClearOnClick")
+            updateClickWatch()
+        }
+    }
+    private struct WaitingAgent {
+        var signal: AgentSignal
+        /// The bundle ID of the app the agent runs in, if its hook named one.
+        var app: String?
+        /// When its latest signal arrived, in system uptime.
+        var since: Double
+    }
+    /// The agents waiting on the user, and why. The logo pulses while this isn't empty, whatever the mode,
+    /// then goes back to the mode. Not saved: a relaunch starts with nothing waiting.
+    private var waitingAgents: [CodingAgent: WaitingAgent] = [:]
+    private let clickWatcher = AgentClickWatcher()
+    /// A click this soon after an agent's signal doesn't clear it, so a click already under way when the
+    /// agent finished doesn't cancel the pulse before it's seen.
+    private static let clickGrace = 1.0
+    /// When the current pulse started, which sets its rhythm, and when the latest signal arrived, which
+    /// the timeout counts from. Both use system uptime, like the glow loop.
+    private var pulseStart: Double?
+    private var lastAgentSignal = 0.0
+    private var pulseReducesMotion = false
+
     @Published var idleGlow = UserDefaults.standard.bool(forKey: "idleGlow") {
         didSet { UserDefaults.standard.set(idleGlow, forKey: "idleGlow") }
     }
@@ -195,7 +269,12 @@ final class GlowModel: ObservableObject {
     /// The preview only needs live levels while the panel is on screen. A hidden SwiftUI host
     /// still lays out on every change, which costs more than the glow loop itself in Music mode.
     @Published var panelVisible = false {
-        didSet { if panelVisible && !oldValue { publishLevel(latestLevel) } }
+        didSet {
+            guard panelVisible && !oldValue else { return }
+            // Opening the panel acknowledges every waiting agent.
+            clearAgents()
+            publishLevel(latestLevel)
+        }
     }
     var onIconChange: ((Bool) -> Void)?
     var onRiseFromDark: (() -> Void)? {
@@ -231,6 +310,7 @@ final class GlowModel: ObservableObject {
         music.preset = eqPreset
         otherApps.onChange = { [weak self] in self?.otherAppsChanged() }
         playback.onChange = { [weak self] playing in self?.playbackChanged(playing) }
+        clickWatcher.onClick = { [weak self] app in self?.clicked(in: app) }
     }
 
     /// `LidglowApp` only creates the model on a Mac with a light-up logo. If CoreBrightness can't
@@ -274,7 +354,7 @@ final class GlowModel: ObservableObject {
 
     /// Turning Lidglow off stops the glow loop and restores the logo to macOS.
     func setEnabled(_ on: Bool) {
-        if !on { stop() }
+        if !on { stop(); clearAgents() }
         enabled = on
         UserDefaults.standard.set(on, forKey: Self.enabledKey)
         start()
@@ -314,6 +394,98 @@ final class GlowModel: ObservableObject {
         }
     }
 
+    /// A signal from an agent's hook, through a `lidglow://agent/…` link. It's acted on only while Agent
+    /// alerts and that agent are turned on, and while Lidglow controls the logo or Pulse even when Lidglow
+    /// is off is on. The pulse goes through the glow loop and `LidLogo` like any mode, so lock, sleep, lid
+    /// close, the switch, and quit still hand the logo back to macOS mid-pulse.
+    func receive(_ request: AgentRequest) {
+        guard agentAlerts, alertingAgents.contains(request.agent) else { return }
+        switch request.signal {
+        case .clear:
+            clear(request.agent)
+        case .attention, .done:
+            // With the switch off the logo belongs to macOS unless the user allowed pulses then. With the
+            // panel open, the user is already looking at Lidglow.
+            guard enabled || agentAlertsWhileOff, !panelVisible else { return }
+            if request.signal == .done && !agentAlertsOnFinish { return }
+            Logger.agents.notice("\(request.agent.title, privacy: .public) asked for attention (\(request.signal.rawValue, privacy: .public))")
+            let now = ProcessInfo.processInfo.systemUptime
+            if waitingAgents.isEmpty {
+                pulseStart = now
+                pulseReducesMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            }
+            // A finished turn doesn't replace a pending prompt from the same agent.
+            let previous = waitingAgents[request.agent]
+            // The app the agent's process runs under, or else the one its hook's environment named.
+            let app = request.pid.flatMap(AgentClickWatcher.hostApp(ofProcess:)) ?? request.app
+            waitingAgents[request.agent] = WaitingAgent(
+                signal: previous?.signal == .attention ? .attention : request.signal,
+                app: app ?? previous?.app, since: now)
+            updateClickWatch()
+            lastAgentSignal = now
+            // With the switch off there's no glow loop, so start one just for the pulse. With it on, a
+            // stopped loop is waiting for the user to retry (or for another logo app to quit), so leave it.
+            if enabled { speedUp() } else if timer == nil { start() }
+        }
+    }
+
+    private func clear(_ agent: CodingAgent) {
+        guard waitingAgents.removeValue(forKey: agent) != nil else { return }
+        Logger.agents.notice("\(agent.title, privacy: .public) no longer needs attention")
+        updateClickWatch()
+        if waitingAgents.isEmpty { pulseEnded() }
+    }
+
+    private func clearAgents() {
+        guard !waitingAgents.isEmpty else { return }
+        waitingAgents = [:]
+        updateClickWatch()
+        pulseEnded()
+    }
+
+    /// Watches clicks only while it's turned on and a waiting agent named its app.
+    private func updateClickWatch() {
+        if agentAlertsClearOnClick && waitingAgents.values.contains(where: { $0.app != nil }) {
+            clickWatcher.start()
+        } else {
+            clickWatcher.stop()
+        }
+    }
+
+    /// A click landed in a window of `app`. Every agent waiting in that app is cleared, as if it had
+    /// reported working again, unless its signal arrived within the last second.
+    private func clicked(in app: String) {
+        let now = ProcessInfo.processInfo.systemUptime
+        for (agent, waiting) in waitingAgents where waiting.app == app && now - waiting.since >= Self.clickGrace {
+            Logger.agents.notice("Clicked in \(agent.title, privacy: .public)'s app")
+            clear(agent)
+        }
+    }
+
+    /// Hands the logo back to the mode, or to macOS if the switch is off, which also stops the glow loop.
+    /// Music starts its silence clock again rather than counting the pulse as silence.
+    private func pulseEnded() {
+        pulseStart = nil
+        musicHeard = nil
+        lastSignal = nil
+        if enabled {
+            speedUp()
+        } else {
+            stop()
+            start()
+        }
+    }
+
+    /// The glow loop runs while the switch is on, and while the switch is off only for an agent's pulse.
+    private var shouldRun: Bool { enabled || pulseStart != nil }
+
+    private var agentStatus: String {
+        guard waitingAgents.count == 1, let (agent, waiting) = waitingAgents.first else {
+            return "\(waitingAgents.count) agents are waiting for you"
+        }
+        return waiting.signal == .attention ? "\(agent.title) needs your input" : "\(agent.title) finished"
+    }
+
     private func start() {
         updateIcon()
         audioError = false
@@ -321,7 +493,7 @@ final class GlowModel: ObservableObject {
         hardwareCheck = 0
         controlFailed = false
         let support = logo.support
-        guard enabled, support == .supported else {
+        guard shouldRun, support == .supported else {
             level = 0
             latestLevel = 0
             // With the switch on, the first tick's `takeControl()` finds a logo whose state can't be read.
@@ -376,7 +548,11 @@ final class GlowModel: ObservableObject {
     private func scheduleNextTick() {
         guard let timer else { return }
         let interval: Double
-        if !(displaysAwake && sessionActive && mayRun) || (mode == .music && audioError) {
+        if !(displaysAwake && sessionActive && mayRun) {
+            interval = Self.idleTick
+        } else if pulseStart != nil {
+            interval = Self.breatheTick
+        } else if mode == .music && audioError {
             interval = Self.idleTick
         } else {
             switch mode {
@@ -402,7 +578,7 @@ final class GlowModel: ObservableObject {
     }
 
     private func otherAppsChanged() {
-        guard enabled else { return }
+        guard shouldRun else { return }
         // `stop()` hands the logo back to macOS through the normal restore path before anything else
         // touches it.
         stop()
@@ -436,17 +612,35 @@ final class GlowModel: ObservableObject {
     @objc private func unlockSession() { sessionActive = true; hardwareCheck = 0; speedUp() }
 
     private func tick() {
-        guard enabled else { return }
+        guard shouldRun else { return }
         defer { scheduleNextTick() }
         let now = ProcessInfo.processInfo.systemUptime
         if now >= hardwareCheck {
             mayRun = logo.awake && !logo.bridge.lidClosed
             hardwareCheck = now + 0.35
         }
+        // Checked before the pause below, so a pulse left behind a lock still times out.
+        if pulseStart != nil, let limit = agentAlertTimeout.seconds, now - lastAgentSignal >= limit {
+            Logger.agents.notice("Agent alert timed out after \(Int(limit)) s")
+            clearAgents()
+            // With the switch off, that stopped the loop and handed the logo back to macOS.
+            guard shouldRun else { return }
+        }
         guard displaysAwake && sessionActive && mayRun else {
             pause()
             publishLevel(0)
             publishStatus("Paused while the lid or screen is inactive")
+            return
+        }
+        // An agent is waiting: the pulse takes over from the mode until it's cleared. Music's input keeps
+        // running if it already was, so the music picks up again right away.
+        if let pulseStart {
+            let lit = AgentPulse.isLit(elapsed: now - pulseStart, reduceMotion: pulseReducesMotion)
+            let target = lit ? agentAlertBrightness : 0
+            let fades = AgentPulse.fades(reduceMotion: pulseReducesMotion)
+            guard driveLogo({ logo.follow(target, now: now, rise: fades.rise, fall: fades.fall) }) else { return }
+            publishLevel(logo.measuredLevel)
+            publishStatus(agentStatus)
             return
         }
         if mode == .music && !music.started && !audioError {
@@ -496,31 +690,39 @@ final class GlowModel: ObservableObject {
                 label = "Waiting for music · Play something on your Mac"
             }
         }
-        let following: Bool
+        let driven: Bool
         if mode == .breathe {
-            following = logo.takeControl() && followBreath(now: now)
+            driven = driveLogo { followBreath(now: now) }
         } else {
-            following = logo.takeControl()
-                && logo.follow(target, now: now, rise: mode == .music ? 0.065 : 0.17,
-                               fall: mode == .music ? 0.15 : 0.22,
-                               tolerance: mode == .music && idleGlow && target == idleBrightness
-                                   ? min(0.012, target / 2) : 0.045)
+            driven = driveLogo {
+                logo.follow(target, now: now, rise: mode == .music ? 0.065 : 0.17,
+                            fall: mode == .music ? 0.15 : 0.22,
+                            tolerance: mode == .music && idleGlow && target == idleBrightness
+                                ? min(0.012, target / 2) : 0.045)
+            }
         }
-        guard following else {
+        guard driven else { return }
+        publishLevel(mode == .music ? logo.measuredLevel : target)
+        publishStatus(label)
+    }
+
+    /// Takes control of the logo and moves it with `follow`. If that fails, or another app is changing the
+    /// logo, it stops the glow loop, which hands the logo back to macOS, and returns false.
+    private func driveLogo(_ follow: () -> Bool) -> Bool {
+        guard logo.takeControl() && follow() else {
             stop()
             publishLevel(0)
             controlFailed = true
             publishStatus(Self.controlError)
-            return
+            return false
         }
         if logo.interferenceDetected {
             stop()
             publishLevel(0)
             publishStatus("Another app is changing the lid logo. Quit it, then select a mode to retry.")
-            return
+            return false
         }
-        publishLevel(mode == .music ? logo.measuredLevel : target)
-        publishStatus(label)
+        return true
     }
 
     /// Chasing the moving breath target made the logo fade a little, hold, and fade again, because
