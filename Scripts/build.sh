@@ -15,6 +15,8 @@ mkdir -p "$destination/Contents/MacOS" "$destination/Contents/Resources"
 cp "$src/Resources/Info.plist" "$destination/Contents/Info.plist"
 # Settings → About → Check for Updates runs this copy, so the app only runs installer code it shipped with.
 cp Scripts/install.sh "$destination/Contents/Resources/install.sh"
+# So does Uninstall on a Mac without a light-up logo.
+cp Scripts/uninstall.sh "$destination/Contents/Resources/uninstall.sh"
 sdk="$(xcrun --sdk macosx --show-sdk-path)"
 target="$(uname -m)-apple-macos27.0"
 xcrun clang -target "$target" -isysroot "$sdk" -fobjc-arc -O2 \

@@ -39,7 +39,7 @@ Run this in Terminal:
 curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/uninstall.sh | bash
 ```
 
-It quits Lidglow so the logo goes back to macOS, then removes the app, its login item, and its settings. If you remove it by hand without the above command, quit Lidglow first, or the logo can stay stuck. In the event the logo gets stuck, it can be restored by closing and reopening the lid.
+It quits Lidglow so the logo goes back to macOS, then removes the app, its login item, and its settings. On a Mac without a light-up logo, the panel's **Uninstall…** button does the same for the copy that's running. If you remove it by hand without the above command, quit Lidglow first, or the logo can stay stuck. In the event the logo gets stuck, it can be restored by closing and reopening the lid.
 
 ## Use
 

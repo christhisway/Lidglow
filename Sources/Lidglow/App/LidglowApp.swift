@@ -153,7 +153,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         }
         if panel == nil {
             let host = NSHostingController(rootView: model.map { AnyView(controls(for: $0)) }
-                                                     ?? AnyView(UnsupportedPanel()))
+                                                     ?? AnyView(unsupportedPanel()))
             host.sizingOptions = []
             // `positionPanel` alone sizes the host, so window resizes never stretch it.
             host.view.autoresizingMask = []
@@ -203,6 +203,16 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             guard let self, !self.handledIconClick(event), event.type != .leftMouseUp else { return }
             self.closePanel()
         }
+    }
+
+    /// The message, Uninstall, and Quit for a Mac without a light-up logo.
+    private func unsupportedPanel() -> UnsupportedPanel {
+        UnsupportedPanel(uninstall: { [weak self] in
+            // The panel floats above alerts, so close it first. The alert waits for the next run-loop pass,
+            // so the button's action has returned before it runs modally.
+            self?.closePanel()
+            DispatchQueue.main.async { Uninstaller.confirmAndRun() }
+        })
     }
 
     /// The full controls for a Mac with a light-up logo. The panel resizes as SwiftUI reports new heights.
