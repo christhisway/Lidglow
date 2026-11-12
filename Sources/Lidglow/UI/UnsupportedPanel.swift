@@ -4,8 +4,11 @@ import AppKit
 import SwiftUI
 
 /// The whole panel on a Mac with no light-up logo. It's static, so it never animates, observes the
-/// model, or reports new heights, and Quit is its only control.
+/// model, or reports new heights, and Uninstall and Quit are its only controls.
 struct UnsupportedPanel: View {
+    /// Closes the panel, asks to confirm, then removes Lidglow and quits.
+    let uninstall: () -> Void
+
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack(spacing: 9) {
@@ -28,6 +31,7 @@ struct UnsupportedPanel: View {
             Divider()
             HStack {
                 Spacer()
+                Button("Uninstall…", action: uninstall).controlSize(.small)
                 Button("Quit") { NSApp.terminate(nil) }.controlSize(.small)
             }
         }

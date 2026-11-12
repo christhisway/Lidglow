@@ -2,6 +2,11 @@
 
 Each release is also published on [GitHub Releases](https://github.com/christhisway/Lidglow/releases) with these notes. **Settings → About → Check for Updates** installs the latest stable release. See [Install](../README.md#install).
 
+## Unreleased
+
+### Added
+- On a Mac without a light-up Apple logo, an **Uninstall…** button next to Quit removes Lidglow and its settings after you confirm.
+
 ## 0.9.0 Beta 1
 
 ### Added
