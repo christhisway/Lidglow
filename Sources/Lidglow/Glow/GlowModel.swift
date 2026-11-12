@@ -253,6 +253,7 @@ final class GlowModel: ObservableObject {
     private let music = SystemMusic()
     private let otherApps = OtherLogoApps()
     private let playback = PlaybackWatcher()
+    private let power = PowerSource()
     private var timer: Timer?
     private var phaseStart = 0.0
     private var sessionActive = true
@@ -310,6 +311,7 @@ final class GlowModel: ObservableObject {
         otherApps.onChange = { [weak self] in self?.otherAppsChanged() }
         playback.onChange = { [weak self] playing in self?.playbackChanged(playing) }
         clickWatcher.onClick = { [weak self] app in self?.clicked(in: app) }
+        power.onChange = { [weak self] _ in self?.chargingChanged() }
     }
 
     /// The logo can be controlled: the hardware is there and the private CoreBrightness interface looks
@@ -359,8 +361,27 @@ final class GlowModel: ObservableObject {
         if !on { stop(); clearAgents() }
         enabled = on
         UserDefaults.standard.set(on, forKey: Self.enabledKey)
+        // Charging only changes the glow while Lidglow is on, so the power source is watched only then.
+        if on { power.start() } else { power.stop() }
         start()
         updatePlaybackWatch()
+    }
+
+    /// While the battery charges, every mode breathes, except Music while music is playing. Plugged in
+    /// with a full battery isn't charging, so the selected mode shows as usual.
+    private var chargingBreath: Bool { enabled && power.isCharging }
+
+    /// Music counts as quiet once nothing above the threshold has played for `silenceDelay`.
+    private func musicQuiet(at now: Double) -> Bool {
+        lastSignal.map { now - $0 >= Self.silenceDelay } ?? true
+    }
+
+    private func chargingChanged() {
+        updateIcon()
+        // Start a borrowed breath from its trough, as Breathe does when it's selected, so it doesn't open
+        // partway through a fade.
+        if power.isCharging && mode != .breathe { phaseStart = ProcessInfo.processInfo.systemUptime }
+        speedUp()
     }
 
     /// Seconds of silence before Music switches back, or nil when it doesn't count silence. Automatically
@@ -515,7 +536,7 @@ final class GlowModel: ObservableObject {
     /// call this on every change, so only touch the status item when the icon actually flips.
     private var iconLit: Bool?
     private func updateIcon() {
-        let lit = !enabled || brightness > 0
+        let lit = !enabled || brightness > 0 || chargingBreath
         guard lit != iconLit else { return }
         iconLit = lit
         onIconChange?(lit)
@@ -549,16 +570,24 @@ final class GlowModel: ObservableObject {
         } else {
             switch mode {
             case .music:
-                let now = ProcessInfo.processInfo.systemUptime
-                let silent = lastSignal.map { now - $0 >= Self.silenceDelay } ?? true
-                if silent && (!hasHardware || logo.isSettled) {
+                let silent = musicQuiet(at: ProcessInfo.processInfo.systemUptime)
+                if silent && chargingBreath {
+                    // Breathing while charging. Each tick still reads the level, so music takes over as
+                    // soon as it starts.
+                    interval = Self.breatheTick
+                } else if silent && (!hasHardware || logo.isSettled) {
                     music.armWake()
                     interval = Self.idleTick
                 } else {
                     interval = Self.fastTick
                 }
             case .breathe: interval = Self.breatheTick
-            case .standard: interval = !hasHardware || logo.isSettled ? Self.idleTick : Self.fastTick
+            case .standard:
+                if chargingBreath {
+                    interval = Self.breatheTick
+                } else {
+                    interval = !hasHardware || logo.isSettled ? Self.idleTick : Self.fastTick
+                }
             }
         }
         if abs(timer.timeInterval - interval) > 1e-6 { schedule(interval) }
@@ -647,12 +676,12 @@ final class GlowModel: ObservableObject {
             }
         }
         if mode == .music && audioError { return }
-        let target: Double
-        let label: String
+        var target: Double
+        var label: String
         switch mode {
         case .standard: target = brightness; label = brightness > 0 ? "Standard glow" : "Lid logo off"
         case .breathe:
-            target = brightness * (0.15 + 0.85 * (1 - cos((now - phaseStart) * 2 * .pi / breatheSpeed.period)) / 2)
+            target = breathTarget(now: now)
             label = "Breathing"
         case .music:
             let signal = music.level(at: now)
@@ -684,9 +713,16 @@ final class GlowModel: ObservableObject {
                 label = "Waiting for music · Play something on your Mac"
             }
         }
+        // While charging, Standard and a quiet Music borrow Breathe's breath, at Breathe's brightness and
+        // speed. Music keeps sampling above, so playback takes over again on the next tick that hears it.
+        let breathing = mode == .breathe || (chargingBreath && (mode != .music || musicQuiet(at: now)))
+        if breathing && mode != .breathe {
+            target = breathTarget(now: now)
+            label = mode == .music ? "Breathing while charging · Waiting for music" : "Breathing while charging"
+        }
         if hasHardware {
             let driven: Bool
-            if mode == .breathe {
+            if breathing {
                 driven = driveLogo { followBreath(now: now) }
             } else {
                 driven = driveLogo {
@@ -698,7 +734,7 @@ final class GlowModel: ObservableObject {
             }
             guard driven else { return }
         }
-        publishLevel(mode == .music && hasHardware ? logo.measuredLevel : target)
+        publishLevel(mode == .music && !breathing && hasHardware ? logo.measuredLevel : target)
         publishStatus(hasHardware ? label : "Preview · " + label)
     }
 
@@ -720,6 +756,12 @@ final class GlowModel: ObservableObject {
         return true
     }
 
+    /// Where the breath is now, for the preview, at Breathe's brightness whichever mode borrows it.
+    private func breathTarget(now: Double) -> Double {
+        brightness(for: .breathe)
+            * (0.15 + 0.85 * (1 - cos((now - phaseStart) * 2 * .pi / breatheSpeed.period)) / 2)
+    }
+
     /// Chasing the moving breath target made the logo fade a little, hold, and fade again, because
     /// each time it caught up it stopped until the target moved past the tolerance. That stepping was
     /// worst at Slow. Instead, aim each ramp at the breath's next peak or trough and time it to arrive
@@ -728,7 +770,8 @@ final class GlowModel: ObservableObject {
         let period = breatheSpeed.period
         let phase = ((now - phaseStart) / period).truncatingRemainder(dividingBy: 1)
         let rising = phase < 0.5
-        let extreme = rising ? brightness : brightness * 0.15
+        let peak = brightness(for: .breathe)
+        let extreme = rising ? peak : peak * 0.15
         let remaining = max(0.05, ((rising ? 0.5 : 1) - phase) * period)
         return logo.follow(extreme, now: now, rise: remaining, fall: remaining, tolerance: 0.03,
                            maxDuration: period)
