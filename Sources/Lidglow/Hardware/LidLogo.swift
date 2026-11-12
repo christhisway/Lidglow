@@ -4,8 +4,26 @@ import CoreGraphics
 import Foundation
 import os
 
+/// Whether Lidglow can drive this Mac's lid logo.
+enum LogoSupport {
+    /// The logo is there and the private CoreBrightness interface works.
+    case supported
+    /// No light-up logo (no `bklb-backlight` service). Lidglow stays inert and only offers Quit.
+    case unsupported
+    /// The logo is there, but CoreBrightness lacks the classes or selectors Lidglow needs, for example
+    /// after a macOS update.
+    case serviceUnavailable
+}
+
 final class LidLogo {
     let bridge = LogoBridge()
+
+    /// Fixed once the bridge has loaded, so it reads nothing from the logo. A logo whose state can't be
+    /// read is caught where Lidglow reads it: `takeControl()`, and `GlowModel.start()` with the switch off.
+    var support: LogoSupport {
+        guard bridge.hardwarePresent else { return .unsupported }
+        return bridge.serviceAvailable ? .supported : .serviceUnavailable
+    }
     private var originalMode: Int?
     private var direction: Bool?
     private var holding = false

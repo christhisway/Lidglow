@@ -7,9 +7,9 @@ Lidglow is a macOS menu-bar app that controls the illuminated Apple logo on MacB
 ## Requirements
 
 - macOS 27 or later on Apple silicon. The app will not launch at all on Intel Macs.
-- A MacBook Pro with PROLED XDR Display to control the logo. No functionality will work on non-PROLED MacBooks.
+- A MacBook Pro with PROLED XDR Display. On other Macs, Lidglow only says the Mac has no light-up Apple logo and offers Quit. It doesn't run anything in the background.
 
-Logo control uses a private macOS interface, so a macOS update can stop it working. If that happens, Lidglow falls back to the preview. If you notice this, please submit an issue.
+Logo control uses a private macOS interface, so a macOS update can stop it working. If that happens, Lidglow leaves the logo to macOS, says it couldn't control the lid logo, and shows a **Report a bug** link that opens the bug report form in your browser.
 
 ## Install
 

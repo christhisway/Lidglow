@@ -12,9 +12,11 @@ private final class TopAnchoredView: NSView {
 
 final class LidglowApp: NSObject, NSApplicationDelegate {
     private var item: NSStatusItem?
-    private let model = GlowModel()
+    /// Created only on a Mac with a light-up logo. Without one, Lidglow stays inert: the panel says so
+    /// and offers Quit, and no timer, audio tap, or system observer is ever set up.
+    private var model: GlowModel?
     private var panel: MenuPanel?
-    private var host: NSHostingController<GlowPanel>?
+    private var host: NSHostingController<AnyView>?
     /// The latest panel height reported while a Reduce Motion resize waits for SwiftUI's update to finish.
     private var pendingHeight: CGFloat?
     private var localMonitor: Any?
@@ -36,10 +38,12 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     private var signalSources: [DispatchSourceSignal] = []
     private lazy var contextMenu: NSMenu = {
         let menu = NSMenu()
-        let settings = NSMenuItem(title: "Open Settings…", action: #selector(openSettings), keyEquivalent: ",")
-        settings.target = self
-        menu.addItem(settings)
-        menu.addItem(.separator())
+        if model != nil {
+            let settings = NSMenuItem(title: "Open Settings…", action: #selector(openSettings), keyEquivalent: ",")
+            settings.target = self
+            menu.addItem(settings)
+            menu.addItem(.separator())
+        }
         let quit = NSMenuItem(title: "Quit Lidglow", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
         menu.addItem(quit)
@@ -47,15 +51,24 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        handleTerminationSignals()
+        // Decided once, before anything else is created. Saved settings are left untouched on an
+        // unsupported Mac, so moving them to a supported one keeps them.
+        let model = LogoBridge.logoHardwarePresent ? GlowModel() : nil
+        self.model = model
+        if model == nil {
+            Logger.hardware.notice("No light-up lid logo found. Lidglow stays inactive.")
+        } else {
+            // With no logo there's nothing to hand back to macOS, and the default signal handling exits.
+            handleTerminationSignals()
+        }
         let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item = status
         status.button?.target = self
         status.button?.action = #selector(statusItemClicked)
         // Act on mouse-up for both buttons so a right-click or Control-click can open the context menu.
         status.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        model.onIconChange = { [weak self] in self?.setIcon(lit: $0) }
-        model.onRiseFromDark = { [weak self] in
+        model?.onIconChange = { [weak self] in self?.setIcon(lit: $0) }
+        model?.onRiseFromDark = { [weak self] in
             guard let button = self?.item?.button else { return }
             button.alphaValue = button.alphaValue == 1 ? 0.98 : 1
         }
@@ -64,7 +77,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         status.expandedInterfaceDelegate = self
         usesMenuBarSession = true
         #endif
-        model.restoreSelectedMode()
+        model?.restoreSelectedMode()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
@@ -75,6 +88,8 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     /// bringing Lidglow to the front. It's the only way in: no network listener. Any app can open these
     /// links, so `AgentRequest` accepts only known signals and agents. Anything else is dropped, and its contents aren't logged.
     func application(_ application: NSApplication, open urls: [URL]) {
+        // With no light-up logo there's nothing to pulse, so the links are dropped unread.
+        guard let model else { return }
         for url in urls {
             guard let request = AgentRequest(url: url) else {
                 Logger.agents.notice("Ignored a link that isn't a known agent signal")
@@ -119,6 +134,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
+        guard let model else { return }
         closePanel()
         if settingsWindow == nil {
             settingsWindow = SettingsWindow(model: model) { [weak self] in self?.settingsWindow = nil }
@@ -136,30 +152,8 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             return
         }
         if panel == nil {
-            let host = NSHostingController(rootView: GlowPanel(model: model, openSettings: { [weak self] in
-                self?.openSettings()
-            }, onHeightChange: { [weak self] height in
-                guard let self, self.panel?.isVisible == true else { return }
-                guard NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-                    // SwiftUI reports the new height in the same pass that adds or removes controls, so the
-                    // window grows or shrinks with them rather than a run-loop pass later. The animator
-                    // starts on the next frame, so this never resizes the window inside SwiftUI's update.
-                    self.positionPanel(contentHeight: height, animate: true)
-                    return
-                }
-                // Without animation the window would resize and redraw inside SwiftUI's layout pass, which
-                // re-entered it and left the panel at the wrong height with its content shifted. Resize once
-                // the update finishes instead, to the latest height reported.
-                let scheduled = self.pendingHeight != nil
-                self.pendingHeight = height
-                guard !scheduled else { return }
-                DispatchQueue.main.async { [weak self] in
-                    guard let self, let height = self.pendingHeight else { return }
-                    self.pendingHeight = nil
-                    guard self.panel?.isVisible == true else { return }
-                    self.positionPanel(contentHeight: height)
-                }
-            }))
+            let host = NSHostingController(rootView: model.map { AnyView(controls(for: $0)) }
+                                                     ?? AnyView(UnsupportedPanel()))
             host.sizingOptions = []
             // `positionPanel` alone sizes the host, so window resizes never stretch it.
             host.view.autoresizingMask = []
@@ -185,8 +179,8 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             self.panel = panel
             self.host = host
         }
-        model.panelVisible = true
-        guard positionPanel(), let panel else { model.panelVisible = false; return }
+        model?.panelVisible = true
+        guard positionPanel(), let panel else { model?.panelVisible = false; return }
         panel.makeKeyAndOrderFront(nil)
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .leftMouseUp,
                                                                   .rightMouseDown]) {
@@ -209,6 +203,34 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             guard let self, !self.handledIconClick(event), event.type != .leftMouseUp else { return }
             self.closePanel()
         }
+    }
+
+    /// The full controls for a Mac with a light-up logo. The panel resizes as SwiftUI reports new heights.
+    private func controls(for model: GlowModel) -> GlowPanel {
+        GlowPanel(model: model, openSettings: { [weak self] in
+            self?.openSettings()
+        }, onHeightChange: { [weak self] height in
+            guard let self, self.panel?.isVisible == true else { return }
+            guard NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+                // SwiftUI reports the new height in the same pass that adds or removes controls, so the
+                // window grows or shrinks with them rather than a run-loop pass later. The animator
+                // starts on the next frame, so this never resizes the window inside SwiftUI's update.
+                self.positionPanel(contentHeight: height, animate: true)
+                return
+            }
+            // Without animation the window would resize and redraw inside SwiftUI's layout pass, which
+            // re-entered it and left the panel at the wrong height with its content shifted. Resize once
+            // the update finishes instead, to the latest height reported.
+            let scheduled = self.pendingHeight != nil
+            self.pendingHeight = height
+            guard !scheduled else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let height = self.pendingHeight else { return }
+                self.pendingHeight = nil
+                guard self.panel?.isVisible == true else { return }
+                self.positionPanel(contentHeight: height)
+            }
+        })
     }
 
     /// Whether a click is on the menu-bar icon, which the monitors leave alone. Without the menu bar session
@@ -286,7 +308,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         }
         #endif
         panel?.orderOut(nil)
-        model.panelVisible = false
+        model?.panelVisible = false
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
         if let outsideMonitor { NSEvent.removeMonitor(outsideMonitor) }
         localMonitor = nil
@@ -297,7 +319,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         if panel?.isVisible == true && !positionPanel() { closePanel() }
     }
 
-    func applicationWillTerminate(_ notification: Notification) { model.stop() }
+    func applicationWillTerminate(_ notification: Notification) { model?.stop() }
 
     /// `kill`, `pkill`, Ctrl-C in Terminal, and a closed Terminal window end the app without a normal
     /// quit, which would leave the logo where Lidglow last put it. Route them through a normal quit so
