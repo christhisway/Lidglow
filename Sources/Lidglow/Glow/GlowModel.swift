@@ -381,9 +381,6 @@ final class GlowModel: ObservableObject {
         // Start a borrowed breath from its trough, as Breathe does when it's selected, so it doesn't open
         // partway through a fade.
         if power.isCharging && mode != .breathe { phaseStart = ProcessInfo.processInfo.systemUptime }
-        // With the lid closed, whether the glow may run depends on charging, so check again right away:
-        // unplugging (or the battery filling) hands the logo back to macOS on the next tick.
-        hardwareCheck = 0
         speedUp()
     }
 
@@ -640,12 +637,7 @@ final class GlowModel: ObservableObject {
         defer { scheduleNextTick() }
         let now = ProcessInfo.processInfo.systemUptime
         if now >= hardwareCheck {
-            let lidClosed = hasHardware && logo.bridge.lidClosed
-            logo.lidClosed = lidClosed
-            // Closing the lid hands the logo back to macOS, which turns it off, unless the battery is
-            // charging: then the logo keeps breathing (or following music) on the closed lid. That only
-            // happens while the Mac stays awake, such as on an external display, since sleep still pauses.
-            mayRun = !hasHardware || (lidClosed ? chargingBreath : logo.awake)
+            mayRun = !hasHardware || (logo.awake && !logo.bridge.lidClosed)
             hardwareCheck = now + 0.35
         }
         // Checked before the pause below, so a pulse left behind a lock still times out.
