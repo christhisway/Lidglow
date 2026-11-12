@@ -22,7 +22,8 @@
 #
 # Settings → About → Check for Updates runs the copy of this script bundled inside Lidglow.app as
 # `install.sh --update`, with LIDGLOW_APP set to the running app's path and LIDGLOW_PID to its process
-# ID. In that mode it installs only the latest stable release, and only if its build number is higher.
+# ID. It may pass a release tag for a beta-channel update. With no tag it checks the latest stable
+# release. Either way, it installs only if the build number is higher.
 # It doesn't quit Lidglow itself: it stages the new app next to the old one, exits with 0, and replaces
 # the app once Lidglow has quit normally. Its other exit codes are 10 when Lidglow is already up to
 # date, 11 when there's no stable release yet, and 1 for any other failure, with the reason on stderr.
@@ -46,10 +47,10 @@ update=false
 if [[ "${1:-}" == "--update" ]]; then
     update=true
     shift
-    (( $# == 0 )) || fail "--update always installs the latest stable release, so it takes no version."
+    (( $# <= 1 )) || fail "--update takes at most one release tag."
     [[ -n "${LIDGLOW_APP:-}" && -d "$LIDGLOW_APP" ]] || fail "--update needs LIDGLOW_APP set to the app to update."
     [[ "${LIDGLOW_PID:-}" =~ ^[0-9]+$ ]] || fail "--update needs LIDGLOW_PID set to the running app's process ID."
-    version=""
+    version="${1:-}"
 else
     (( $# <= 1 )) || fail "Pass at most one version, for example: $install_command -s -- v0.9.0-beta.1"
     version="${1:-${LIDGLOW_VERSION:-}}"
@@ -83,9 +84,9 @@ work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
 say "Downloading Lidglow from $base"
 status=0
-curl -fsSL "$base/Lidglow.zip" -o "$work/Lidglow.zip" 2>/dev/null || status=$?
-if (( status == 22 )) && [[ -z "${LIDGLOW_RELEASE_URL:-}" ]]; then
-    # curl exits with 22 when GitHub answers with an error such as 404.
+http_status="$(curl -fsSL --connect-timeout 10 --max-time 120 -w '%{http_code}' \
+    "$base/Lidglow.zip" -o "$work/Lidglow.zip" 2>/dev/null)" || status=$?
+if (( status == 22 )) && [[ "$http_status" == 404 && -z "${LIDGLOW_RELEASE_URL:-}" ]]; then
     if [[ -n "$version" ]]; then
         fail "There's no Lidglow release named $version. See the versions at $releases_page"
     fi
@@ -94,7 +95,8 @@ if (( status == 22 )) && [[ -z "${LIDGLOW_RELEASE_URL:-}" ]]; then
 See the versions at $releases_page" "$no_stable_release"
 fi
 (( status == 0 )) || fail "Couldn't download Lidglow.zip. Check your internet connection and try again."
-curl -fsSL "$base/Lidglow.zip.sha256" -o "$work/Lidglow.zip.sha256" || fail "Couldn't download the checksum."
+curl -fsSL --connect-timeout 10 --max-time 30 "$base/Lidglow.zip.sha256" \
+    -o "$work/Lidglow.zip.sha256" 2>/dev/null || fail "Couldn't download the checksum."
 expected="$(awk '{ print $1; exit }' "$work/Lidglow.zip.sha256")"
 actual="$(shasum -a 256 "$work/Lidglow.zip" | awk '{ print $1 }')"
 [[ -n "$expected" && "$expected" == "$actual" ]] || fail "The download doesn't match its checksum. Nothing was installed."
@@ -113,15 +115,16 @@ if $update; then
     current_build="$(build_of "$app")"
     [[ "$new_build" =~ ^[0-9]+$ && "$current_build" =~ ^[0-9]+$ ]] || fail "Couldn't read the build numbers to compare."
     if (( new_build <= current_build )); then
-        say "Lidglow is up to date (build $current_build; the latest stable release is build $new_build)."
+        say "Lidglow is up to date (build $current_build; the selected release is build $new_build)."
         exit "$up_to_date"
     fi
     folder="$(dirname -- "$app")"
     [[ -w "$folder" ]] || fail "Lidglow can't replace itself in $folder. Run the install command in Terminal instead."
     # Stage the new app in the same folder, so the swap after Lidglow quits is a quick rename.
-    staged="$folder/.Lidglow-update-$$.app"
-    rm -rf -- "$staged"
-    ditto "$new_app" "$staged" || { rm -rf -- "$staged"; fail "Couldn't copy the update into $folder."; }
+    stage_dir="$(mktemp -d "$folder/.Lidglow-update.XXXXXX")" || fail "Couldn't stage the update in $folder."
+    staged="$stage_dir/Lidglow.app"
+    backup="$stage_dir/Previous.app"
+    ditto "$new_app" "$staged" || { rm -rf -- "$stage_dir"; fail "Couldn't copy the update into $folder."; }
     # Runs on after this script exits. Its output goes nowhere, so Lidglow doesn't wait on it.
     (
         trap - EXIT
@@ -129,10 +132,29 @@ if $update; then
         for _ in {1..600}; do kill -0 "$LIDGLOW_PID" 2>/dev/null || break; sleep 0.1; done
         if kill -0 "$LIDGLOW_PID" 2>/dev/null; then
             # Lidglow didn't quit within a minute, so leave the installed app alone.
-            rm -rf -- "$staged"
+            rm -rf -- "$stage_dir"
             exit 1
         fi
-        rm -rf -- "$app" && mv -- "$staged" "$app" && open "$app"
+        # Another copy may have been installed while Lidglow was quitting.
+        if [[ "$(build_of "$app")" != "$current_build" ]] || ! mv -- "$app" "$backup"; then
+            rm -rf -- "$stage_dir"
+            exit 1
+        fi
+        if ! mv -- "$staged" "$app"; then
+            if [[ ! -e "$app" ]] && mv -- "$backup" "$app"; then
+                rm -rf -- "$stage_dir"
+                open "$app"
+            fi
+            exit 1
+        fi
+        if ! open "$app"; then
+            if mv -- "$app" "$staged" && mv -- "$backup" "$app"; then
+                rm -rf -- "$stage_dir"
+                open "$app"
+            fi
+            exit 1
+        fi
+        rm -rf -- "$stage_dir"
     ) </dev/null >/dev/null 2>&1 &
     disown 2>/dev/null || true
     say "Build $new_build is ready. It replaces $app once Lidglow quits."

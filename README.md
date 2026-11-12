@@ -27,7 +27,7 @@ Upon stable release, this command installs the latest version:
 curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash
 ```
 
-The script verifies the download, installs `Lidglow.app` in `/Applications`, and opens it. Run it again to update, or use **Settings → About → Check for Updates** once stable releases exist.
+The script verifies the download, installs `Lidglow.app` in `/Applications`, and opens it. In builds that support beta updates, **Settings → About → Check for Updates** installs a newer beta or stable release and reopens Lidglow. Stable builds check for stable releases.
 
 Lidglow is not notarized by Apple. If you download `Lidglow.zip` in a browser instead, open the app once, close the security alert, then click **Open Anyway** in **System Settings → Privacy & Security**.
 

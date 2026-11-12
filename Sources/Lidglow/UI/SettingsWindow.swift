@@ -291,22 +291,18 @@ enum ProjectLinks {
 private struct AboutSection: View {
     @ObservedObject private var updater = Updater.shared
 
-    private var isBeta: Bool {
-        !((Bundle.main.infoDictionary?["LidglowReleaseLabel"] as? String) ?? "").isEmpty
-    }
-
     private var updateStatus: String {
         switch updater.state {
         case .idle:
-            return "Installs the latest stable release from GitHub if it’s newer, then reopens Lidglow. Lidglow only connects when you click."
+            return Updater.includesBetas
+                ? "Checks GitHub for stable and beta releases. Installs a newer build and reopens Lidglow."
+                : "Checks GitHub for a newer stable release. Installs it and reopens Lidglow."
         case .checking:
-            return "Checking GitHub for a newer stable release…"
-        case .upToDate where isBeta:
-            return "There’s no newer stable release. Newer betas are listed under View Releases."
+            return "Checking GitHub for updates…"
         case .upToDate:
             return "Lidglow is up to date."
-        case .noStableRelease:
-            return "There’s no stable release yet. Betas are listed under View Releases."
+        case .noRelease:
+            return Updater.includesBetas ? "No releases are available yet." : "There’s no stable release yet."
         case .installing:
             return "Installing the update. Lidglow will quit and reopen."
         case .failed(let reason):

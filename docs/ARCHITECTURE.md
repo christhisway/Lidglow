@@ -24,7 +24,7 @@ How Lidglow behaves and why, what each source file does, and what to check by ha
 | `App/Main.swift` | Entry point; starts the accessory (menu-bar) app, or only unregisters the login item for the uninstaller |
 | `App/Log.swift` | `Logger` categories for local diagnostics (hardware, audio, update checks, and agent alerts, no audio data) |
 | `App/Uninstaller.swift` | Uninstall… on a Mac without a light-up logo: confirms, runs the bundled `uninstall.sh --from-app`, shows its reason if it can't, and otherwise quits so the script can remove the app |
-| `App/Updater.swift` | Check for Updates: runs the bundled `install.sh --update` only on a click, reads its exit code (staged, up to date, no stable release, or failed), and quits normally so the installer can replace the app |
+| `App/Updater.swift` | Check for Updates: runs the bundled `install.sh --update` only on a click, supplies a GitHub release tag on beta builds, and quits normally when a newer build is staged |
 | `App/LidglowApp.swift` | Application delegate: status item and its context menu, panel window, positioning, event monitors, Settings window, and `lidglow://` agent links |
 | `Glow/GlowMode.swift` | The modes and their icons, the Breathe speeds, and the Music silence timeouts |
 | `Glow/GlowModel.swift` | Mode and settings state, tick loop, session lifecycle, automatic switching into and out of Music, breathing while charging, and the agent alert pulse |

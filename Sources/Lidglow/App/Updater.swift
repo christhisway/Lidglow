@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import AppKit
+import Foundation
 import os
 
 /// Settings → About → Check for Updates, Lidglow's only network access. It runs only when the user clicks
 /// the button and only downloads from GitHub Releases, sending nothing about the user. The copy of
-/// `Scripts/install.sh` bundled in the app does the work as `install.sh --update`: it installs the latest
-/// stable release only if its build number is higher, then waits for Lidglow to quit normally (which hands
+/// `Scripts/install.sh` bundled in the app installs a release only if its build number is higher.
+/// It waits for Lidglow to quit normally (which hands
 /// the logo back to macOS) before replacing the app and reopening it.
+@MainActor
 final class Updater: ObservableObject {
     static let shared = Updater()
 
@@ -15,7 +17,7 @@ final class Updater: ObservableObject {
         case idle
         case checking
         case upToDate
-        case noStableRelease
+        case noRelease
         case installing
         case failed(String)
     }
@@ -32,16 +34,66 @@ final class Updater: ObservableObject {
     private init() {}
 
     var isBusy: Bool { state == .checking || state == .installing }
+    static var includesBetas: Bool {
+        let label = Bundle.main.object(forInfoDictionaryKey: "LidglowReleaseLabel") as? String
+        return label?.lowercased().hasPrefix("beta") == true
+    }
 
     func check() {
         guard !isBusy else { return }
+        state = .checking
+        Logger.update.info("Checking for updates")
+        // Keep the installer's local release override available for end-to-end development tests.
+        guard Self.includesBetas, ProcessInfo.processInfo.environment["LIDGLOW_RELEASE_URL"] == nil else {
+            runInstaller()
+            return
+        }
+        Task {
+            do {
+                guard let tag = try await Self.latestBetaChannelTag() else {
+                    state = .noRelease
+                    return
+                }
+                runInstaller(tag: tag)
+            } catch {
+                Logger.update.error("Release lookup failed: \(error.localizedDescription, privacy: .public)")
+                state = .failed("Couldn’t check GitHub for updates. Try again in a moment.")
+            }
+        }
+    }
+
+    private struct Release: Decodable {
+        let tag_name: String
+        let draft: Bool
+    }
+
+    private static func latestBetaChannelTag() async throws -> String? {
+        let url = URL(string: "https://api.github.com/repos/christhisway/Lidglow/releases?per_page=100")!
+        let request = URLRequest(url: url, timeoutInterval: 20)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        let releases = try JSONDecoder().decode([Release].self, from: data)
+        return releases.filter { release in
+            !release.draft && release.tag_name.range(of: #"^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$"#,
+                                                     options: .regularExpression) != nil
+        }.map(\.tag_name).max { left, right in
+            let leftParts = left.split(separator: "-")
+            let rightParts = right.split(separator: "-")
+            let baseOrder = leftParts[0].compare(rightParts[0], options: .numeric)
+            if baseOrder != .orderedSame { return baseOrder == .orderedAscending }
+            if leftParts.count != rightParts.count { return leftParts.count > rightParts.count }
+            return left.compare(right, options: .numeric) == .orderedAscending
+        }
+    }
+
+    private func runInstaller(tag: String? = nil) {
         guard let script = Bundle.main.url(forResource: "install", withExtension: "sh") else {
             state = .failed("This copy of Lidglow doesn’t include the updater. Run the install command in Terminal instead.")
             return
         }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = [script.path, "--update"]
+        process.arguments = [script.path, "--update"] + (tag.map { [$0] } ?? [])
         // Only the settings this check needs reach the installer. LIDGLOW_RELEASE_URL is kept for testing.
         var environment = ProcessInfo.processInfo.environment.filter {
             !$0.key.hasPrefix("LIDGLOW_") || $0.key == "LIDGLOW_RELEASE_URL"
@@ -59,8 +111,6 @@ final class Updater: ObservableObject {
             let status = process.terminationStatus
             DispatchQueue.main.async { self?.finish(status: status, message: message) }
         }
-        state = .checking
-        Logger.update.info("Checking for updates")
         do {
             try process.run()
         } catch {
@@ -81,7 +131,7 @@ final class Updater: ObservableObject {
             state = .upToDate
         case Exit.noStableRelease:
             Logger.update.info("No stable release yet")
-            state = .noStableRelease
+            state = .noRelease
         default:
             let reason = message
                 .replacingOccurrences(of: "Lidglow install: ", with: "")
