@@ -18,7 +18,7 @@ Until 1.0 there's no stable release, so run the install command with the beta ve
 Run this in Terminal:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash -s -- v0.9.0-beta.1
+curl -fsSL https://raw.githubusercontent.com/christhisway/Lidglow/main/Scripts/install.sh | bash -s -- v0.9.0-beta.2
 ```
 
 Upon stable release, this command installs the latest version:
