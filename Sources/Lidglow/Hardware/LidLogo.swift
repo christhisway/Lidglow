@@ -27,6 +27,9 @@ final class LidLogo {
     private var reference: (level: Double, time: Double, command: Double)?
     private var nextModeCheck = 0.0
     var onRiseFromDark: (() -> Void)?
+    /// Set by the glow loop's hardware check. The logo is only driven with the lid closed while the battery
+    /// charges. Then a fade to dark leaves the keyboard backlight alone instead of relighting it under the lid.
+    var lidClosed = false
 
     /// While Lidglow holds the logo, macOS's original backlight mode is saved here. A normal restore
     /// clears it, so finding it at launch means the last run crashed, was force quit, or was killed.
@@ -190,7 +193,7 @@ final class LidLogo {
     }
 
     private func command(_ lit: Bool, duration: Double, hold: Bool, now: Double) -> Bool {
-        guard bridge.fade(towardLight: lit, duration: duration, displayAwake: true) else { return false }
+        guard bridge.fade(towardLight: lit, duration: duration, displayAwake: !lidClosed) else { return false }
         direction = lit
         holding = hold
         lastChange = now
