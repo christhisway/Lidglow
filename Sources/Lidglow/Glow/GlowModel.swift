@@ -756,10 +756,9 @@ final class GlowModel: ObservableObject {
         // While charging, Standard and a quiet Music borrow Breathe's breath, at Breathe's brightness and
         // speed. Music keeps sampling above, so playback takes over again on the next tick that hears it.
         let breathing = mode == .breathe || (chargingBreath && (mode != .music || musicQuiet(at: now)))
-        if breathing && mode != .breathe {
-            target = breathTarget(now: now)
-            label = Self.chargingLabel
-        }
+        if breathing && mode != .breathe { target = breathTarget(now: now) }
+        // Breathe looks the same either way, but the status still says the breath comes from charging.
+        if breathing && chargingBreath { label = Self.chargingLabel }
         if hasHardware {
             let driven: Bool
             if breathing {
