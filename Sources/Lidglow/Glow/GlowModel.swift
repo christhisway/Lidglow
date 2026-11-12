@@ -366,15 +366,32 @@ final class GlowModel: ObservableObject {
         if !on { stop(); clearAgents() }
         enabled = on
         UserDefaults.standard.set(on, forKey: Self.enabledKey)
-        // Charging only changes the glow while Lidglow is on, so the power source is watched only then.
-        if on { power.start() } else { power.stop() }
+        updatePowerWatch()
         start()
         updatePlaybackWatch()
     }
 
+    /// Settings → General → Breathe while charging. On by default. Off, charging never changes the glow
+    /// and the power source isn't watched.
+    @Published var breatheWhileCharging = UserDefaults.standard.object(forKey: "breatheWhileCharging") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(breatheWhileCharging, forKey: "breatheWhileCharging")
+            updatePowerWatch()
+            // Hand the glow back to the mode (or, if locked, to macOS) on the next tick, or start the breath.
+            chargingChanged()
+        }
+    }
+
+    /// Charging only changes the glow while Lidglow is on and Breathe while charging is on, so the power
+    /// source is watched only then.
+    private func updatePowerWatch() {
+        if enabled && breatheWhileCharging { power.start() } else { power.stop() }
+    }
+
     /// While the battery charges, every mode breathes, except Music while music is playing. Plugged in
     /// with a full battery isn't charging, so the selected mode shows as usual.
-    private var chargingBreath: Bool { enabled && power.isCharging }
+    private var chargingBreath: Bool { enabled && breatheWhileCharging && power.isCharging }
+    private static let chargingLabel = "Breathing (Charging)"
 
     /// Music counts as quiet once nothing above the threshold has played for `silenceDelay`.
     private func musicQuiet(at now: Double) -> Bool {
@@ -385,7 +402,7 @@ final class GlowModel: ObservableObject {
         updateIcon()
         // Start a borrowed breath from its trough, as Breathe does when it's selected, so it doesn't open
         // partway through a fade.
-        if power.isCharging && mode != .breathe { phaseStart = ProcessInfo.processInfo.systemUptime }
+        if chargingBreath && mode != .breathe { phaseStart = ProcessInfo.processInfo.systemUptime }
         speedUp()
     }
 
@@ -673,7 +690,7 @@ final class GlowModel: ObservableObject {
             musicHeard = nil
             if hasHardware { guard driveLogo({ followBreath(now: now) }) else { return } }
             publishLevel(breathTarget(now: now))
-            publishStatus(hasHardware ? "Breathing while charging · Locked" : "Preview · Breathing while charging · Locked")
+            publishStatus(hasHardware ? Self.chargingLabel : "Preview · " + Self.chargingLabel)
             return
         }
         // An agent is waiting: the pulse takes over from the mode until it's cleared. Music's input keeps
@@ -741,7 +758,7 @@ final class GlowModel: ObservableObject {
         let breathing = mode == .breathe || (chargingBreath && (mode != .music || musicQuiet(at: now)))
         if breathing && mode != .breathe {
             target = breathTarget(now: now)
-            label = mode == .music ? "Breathing while charging · Waiting for music" : "Breathing while charging"
+            label = Self.chargingLabel
         }
         if hasHardware {
             let driven: Bool
