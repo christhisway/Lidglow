@@ -74,3 +74,5 @@ Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](docs/CO
 Copyright © 2026 christhisway and Lidglow contributors. Lidglow is free software under the [GNU General Public License](LICENSE), version 3 or later, and comes with no warranty. The license covers the code, not the Lidglow name or icon, so please rename forks you distribute.
 
 Lidglow isn't made, endorsed, or supported by Apple. Apple, the Apple logo, Mac, MacBook Pro, and macOS are trademarks of Apple Inc.
+
+Created by Jayden Webb and Kunal Singh.
