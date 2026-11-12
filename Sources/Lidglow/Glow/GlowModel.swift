@@ -256,7 +256,12 @@ final class GlowModel: ObservableObject {
     private let power = PowerSource()
     private var timer: Timer?
     private var phaseStart = 0.0
+    /// False while another user's session is in front (fast user switching), which always hands the logo
+    /// back to macOS.
     private var sessionActive = true
+    /// The screen is locked. That hands the logo back to macOS too, unless the battery is charging: then
+    /// the logo keeps breathing, and nothing else (Music's input, an agent's pulse) runs until unlock.
+    private var screenLocked = false
     private var displaysAwake = true
     private var hardwareCheck = 0.0
     private var mayRun = true
@@ -296,8 +301,8 @@ final class GlowModel: ObservableObject {
             NSWorkspace.shared.notificationCenter.addObserver(self, selector: action, name: event, object: nil)
         }
         let distributed = DistributedNotificationCenter.default()
-        distributed.addObserver(self, selector: #selector(lockSession), name: .init("com.apple.screenIsLocked"), object: nil)
-        distributed.addObserver(self, selector: #selector(unlockSession), name: .init("com.apple.screenIsUnlocked"), object: nil)
+        distributed.addObserver(self, selector: #selector(lockScreen), name: .init("com.apple.screenIsLocked"), object: nil)
+        distributed.addObserver(self, selector: #selector(unlockScreen), name: .init("com.apple.screenIsUnlocked"), object: nil)
         music.onSound = { [weak self] in self?.speedUp() }
         music.source = musicInput
         music.onFailure = { [weak self] error in
@@ -561,9 +566,9 @@ final class GlowModel: ObservableObject {
     private func scheduleNextTick() {
         guard let timer else { return }
         let interval: Double
-        if !(displaysAwake && sessionActive && mayRun) {
+        if !(displaysAwake && sessionActive && mayRun) || (screenLocked && !chargingBreath) {
             interval = Self.idleTick
-        } else if pulseStart != nil {
+        } else if screenLocked || pulseStart != nil {
             interval = Self.breatheTick
         } else if mode == .music && audioError {
             interval = Self.idleTick
@@ -631,6 +636,12 @@ final class GlowModel: ObservableObject {
     @objc private func screenWake() { displaysAwake = true; hardwareCheck = 0; speedUp() }
     @objc private func lockSession() { sessionActive = false; pause() }
     @objc private func unlockSession() { sessionActive = true; hardwareCheck = 0; speedUp() }
+    @objc private func lockScreen() {
+        screenLocked = true
+        // While charging, the next tick switches to the locked breath. Otherwise hand the logo back now.
+        if chargingBreath { speedUp() } else { pause() }
+    }
+    @objc private func unlockScreen() { screenLocked = false; hardwareCheck = 0; speedUp() }
 
     private func tick() {
         guard shouldRun else { return }
@@ -647,10 +658,22 @@ final class GlowModel: ObservableObject {
             // With the switch off, that stopped the loop and handed the logo back to macOS.
             guard shouldRun else { return }
         }
-        guard displaysAwake && sessionActive && mayRun else {
+        guard displaysAwake && sessionActive && mayRun && (!screenLocked || chargingBreath) else {
             pause()
             publishLevel(0)
             publishStatus("Paused while the lid or screen is inactive")
+            return
+        }
+        // Locked while charging: only the charging breath shows, whatever the mode. Music's input stays off,
+        // as it does whenever the screen is locked, and a waiting agent's pulse shows after unlock. Unplugging,
+        // display sleep, and lid close all reach the pause above on a later tick.
+        if screenLocked {
+            if music.started { music.stop() }
+            lastSignal = nil
+            musicHeard = nil
+            if hasHardware { guard driveLogo({ followBreath(now: now) }) else { return } }
+            publishLevel(breathTarget(now: now))
+            publishStatus(hasHardware ? "Breathing while charging · Locked" : "Preview · Breathing while charging · Locked")
             return
         }
         // An agent is waiting: the pulse takes over from the mode until it's cleared. Music's input keeps

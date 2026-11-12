@@ -6,7 +6,7 @@ Each release is also published on [GitHub Releases](https://github.com/christhis
 
 ### Added
 - Agent alerts in Settings → Agents (off by default): the logo pulses over any mode, and optionally while Lidglow is off, when Claude Code or Codex needs your input or finishes, until you reply, click in the agent's app, open the panel, or it times out. Agents signal Lidglow through hooks you paste into their config, with a `lidglow://` link and no network access.
-- While your Mac charges, the logo breathes in every mode, except Music while music is playing. With a full battery the selected mode shows as usual.
+- While your Mac charges, the logo breathes in every mode, except Music while music is playing. It keeps breathing while the screen is locked, until the display sleeps. With a full battery the selected mode shows as usual.
 
 ## 0.9.0 Beta 1
 
