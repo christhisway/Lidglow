@@ -87,40 +87,75 @@ enum LaptopChassis {
     }
 
     // A neutral photo studio in six cube faces. It lights the metal without drawing a backdrop.
-    static let studio: [CGImage] = {
-        let side = 64
-        let faces: [(SIMD3<Float>, SIMD3<Float>, SIMD3<Float>)] = [
-            ([1, 0, 0], [0, 0, -1], [0, 1, 0]), ([-1, 0, 0], [0, 0, 1], [0, 1, 0]),
-            ([0, 1, 0], [1, 0, 0], [0, 0, -1]), ([0, -1, 0], [1, 0, 0], [0, 0, 1]),
-            ([0, 0, 1], [1, 0, 0], [0, 1, 0]), ([0, 0, -1], [-1, 0, 0], [0, 1, 0])
-        ]
-        let softboxes: [(SIMD3<Float>, Float, Float)] = [
-            (simd_normalize([-0.75, 1, 0.65]), 0.78, 9),
-            (simd_normalize([0.76, 0.55, -1]), 0.63, 13),
-            (simd_normalize([0.2, 1, -0.2]), 0.37, 5)
-        ]
-        return faces.compactMap { forward, right, up in
-            var bytes: [UInt8] = []
-            bytes.reserveCapacity(side * side * 4)
-            for y in 0..<side {
-                for x in 0..<side {
-                    let u = (Float(x) + 0.5) * 2 / Float(side) - 1
-                    let v = 1 - (Float(y) + 0.5) * 2 / Float(side)
-                    let direction = simd_normalize(forward + right * u + up * v)
-                    var light: Float = 0.055 + 0.10 * max(0, direction.y)
-                    for (aim, strength, falloff) in softboxes {
-                        light += strength * pow(max(0, simd_dot(direction, aim)), falloff)
-                    }
-                    let gray = UInt8((min(1, light) * 255).rounded())
-                    bytes.append(contentsOf: [gray, gray, gray, 255])
-                }
-            }
-            guard let data = CGDataProvider(data: Data(bytes) as CFData),
-                  let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
-            return CGImage(width: side, height: side, bitsPerComponent: 8, bitsPerPixel: 32,
-                           bytesPerRow: side * 4, space: colorSpace,
-                           bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
-                           provider: data, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+    // The pieces are small and explicitly typed so the Command Line Tools' compiler can type-check them.
+    static let studio: [CGImage] = studioFaces.compactMap { studioImage(for: $0) }
+
+    private struct StudioFace {
+        let forward: SIMD3<Float>
+        let right: SIMD3<Float>
+        let up: SIMD3<Float>
+    }
+
+    private struct Softbox {
+        let aim: SIMD3<Float>
+        let strength: Float
+        let falloff: Float
+    }
+
+    private static let studioSide = 64
+
+    private static let studioFaces: [StudioFace] = [
+        StudioFace(forward: SIMD3<Float>(1, 0, 0), right: SIMD3<Float>(0, 0, -1), up: SIMD3<Float>(0, 1, 0)),
+        StudioFace(forward: SIMD3<Float>(-1, 0, 0), right: SIMD3<Float>(0, 0, 1), up: SIMD3<Float>(0, 1, 0)),
+        StudioFace(forward: SIMD3<Float>(0, 1, 0), right: SIMD3<Float>(1, 0, 0), up: SIMD3<Float>(0, 0, -1)),
+        StudioFace(forward: SIMD3<Float>(0, -1, 0), right: SIMD3<Float>(1, 0, 0), up: SIMD3<Float>(0, 0, 1)),
+        StudioFace(forward: SIMD3<Float>(0, 0, 1), right: SIMD3<Float>(1, 0, 0), up: SIMD3<Float>(0, 1, 0)),
+        StudioFace(forward: SIMD3<Float>(0, 0, -1), right: SIMD3<Float>(-1, 0, 0), up: SIMD3<Float>(0, 1, 0))
+    ]
+
+    private static let softboxes: [Softbox] = [
+        Softbox(aim: simd_normalize(SIMD3<Float>(-0.75, 1, 0.65)), strength: 0.78, falloff: 9),
+        Softbox(aim: simd_normalize(SIMD3<Float>(0.76, 0.55, -1)), strength: 0.63, falloff: 13),
+        Softbox(aim: simd_normalize(SIMD3<Float>(0.2, 1, -0.2)), strength: 0.37, falloff: 5)
+    ]
+
+    /// Maps a pixel index to -1...1 across the face, through the pixel's center.
+    private static func studioCoordinate(_ index: Int) -> Float {
+        let center: Float = Float(index) + 0.5
+        let span: Float = Float(studioSide)
+        return center * 2 / span - 1
+    }
+
+    private static func studioLight(toward direction: SIMD3<Float>) -> Float {
+        let sky: Float = max(0, direction.y)
+        var light: Float = 0.055 + 0.10 * sky
+        for softbox in softboxes {
+            let facing: Float = max(0, simd_dot(direction, softbox.aim))
+            light += softbox.strength * pow(facing, softbox.falloff)
         }
-    }()
+        return light
+    }
+
+    private static func studioImage(for face: StudioFace) -> CGImage? {
+        let side = studioSide
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(side * side * 4)
+        for y in 0..<side {
+            let v: Float = -studioCoordinate(y)
+            for x in 0..<side {
+                let u: Float = studioCoordinate(x)
+                let across: SIMD3<Float> = face.forward + face.right * u
+                let direction: SIMD3<Float> = simd_normalize(across + face.up * v)
+                let light: Float = studioLight(toward: direction)
+                let gray = UInt8((min(1, light) * 255).rounded())
+                bytes.append(contentsOf: [gray, gray, gray, 255])
+            }
+        }
+        guard let data = CGDataProvider(data: Data(bytes) as CFData),
+              let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue)
+        return CGImage(width: side, height: side, bitsPerComponent: 8, bitsPerPixel: 32,
+                       bytesPerRow: side * 4, space: colorSpace, bitmapInfo: bitmapInfo,
+                       provider: data, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+    }
 }
