@@ -99,9 +99,29 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    private lazy var menuBarIcons: (lit: NSImage, dimmed: NSImage)? = {
+        guard let url = Bundle.main.url(forResource: "MenuBarIcon", withExtension: "png"),
+              let source = NSImage(contentsOf: url) else { return nil }
+        let size = NSSize(width: 20, height: 20)
+        func template(opacity: CGFloat) -> NSImage {
+            let image = NSImage(size: size, flipped: false) { rect in
+                source.draw(in: rect, from: .zero, operation: .sourceOver, fraction: opacity)
+                return true
+            }
+            image.isTemplate = true
+            image.accessibilityDescription = "Lidglow"
+            return image
+        }
+        return (template(opacity: 1), template(opacity: 0.48))
+    }()
+
     private func setIcon(lit: Bool) {
-        item?.button?.image = NSImage(systemSymbolName: lit ? "waveform.circle" : "circle",
-                                      accessibilityDescription: "Lidglow")
+        if let icons = menuBarIcons {
+            item?.button?.image = lit ? icons.lit : icons.dimmed
+        } else {
+            item?.button?.image = NSImage(systemSymbolName: lit ? "waveform.circle" : "circle",
+                                          accessibilityDescription: "Lidglow")
+        }
         item?.button?.toolTip = "Lidglow"
     }
 
