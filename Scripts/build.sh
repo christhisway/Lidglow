@@ -13,6 +13,7 @@ mkdir -p "$module_cache"
 trap 'rm -rf -- "$cache"' EXIT
 mkdir -p "$destination/Contents/MacOS" "$destination/Contents/Resources"
 cp "$src/Resources/Info.plist" "$destination/Contents/Info.plist"
+cp "$src/Resources/AppIcon.icns" "$destination/Contents/Resources/AppIcon.icns"
 # Settings → About → Check for Updates runs this copy, so the app only runs installer code it shipped with.
 cp Scripts/install.sh "$destination/Contents/Resources/install.sh"
 # So does Uninstall on a Mac without a light-up logo.
