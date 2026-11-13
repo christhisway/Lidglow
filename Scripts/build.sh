@@ -19,11 +19,12 @@ cp "$src/Resources/MenuBarIcon.png" "$src/Resources/MenuBarIconOutline.png" "$re
 if xcrun --find actool >/dev/null 2>&1; then
     mkdir -p "$cache/IconOutput" "$cache/IconSupport.xcassets"
     printf '%s\n' '{"info":{"author":"xcode","version":1}}' > "$cache/IconSupport.xcassets/Contents.json"
-    # actool can report diagnostics on stdout alongside its generated-file list.
+    # actool reports diagnostics on stdout alongside its generated-file list. Keep the diagnostics and drop the list.
     xcrun actool "$cache/IconSupport.xcassets" "$src/Resources/AppIcon.icon" \
         --compile "$cache/IconOutput" --app-icon AppIcon --platform macosx \
         --target-device mac --minimum-deployment-target 27.0 \
-        --output-partial-info-plist "$cache/IconInfo.plist" --warnings --errors |
+        --output-partial-info-plist "$cache/IconInfo.plist" --warnings --errors \
+        --output-format human-readable-text |
         awk '/^\/\* com\.apple\.actool\./ { results = /compilation-results/ } !results && NF' >&2
     cp "$cache/IconOutput/Assets.car" "$resources/Assets.car"
     if [[ -f "$cache/IconOutput/AppIcon.icns" ]]; then
