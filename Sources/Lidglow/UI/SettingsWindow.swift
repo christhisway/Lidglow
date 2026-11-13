@@ -43,7 +43,8 @@ private struct SettingsView: View {
 
     var body: some View {
         Form {
-            GeneralSection(model: model)
+            GeneralSection()
+            PowerSection(model: model)
             MusicSection(model: model)
             AgentsSection(model: model)
             AboutSection()
@@ -236,10 +237,36 @@ private struct MusicApp: Identifiable {
     }
 }
 
-/// Open at Login, through the system's login item service for the app itself (macOS 13 and later), and
-/// Breathe while charging.
-private struct GeneralSection: View {
+/// Breathe while charging and Caffeinate on Screen Timeout: what the glow does as the power and
+/// display state change.
+private struct PowerSection: View {
     @ObservedObject var model: GlowModel
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $model.breatheWhileCharging) {
+                Text("Breathe while charging")
+                Text("Every mode breathes while the battery charges, except Music while music plays.")
+            }
+            Toggle(isOn: $model.caffeinateOnScreenTimeout) {
+                Text("Caffeinate on Screen Timeout")
+                Text(model.enabled
+                     ? "Keeps the logo lit while the screen is off and your Mac stays awake. Uses more energy."
+                     : "Turn on Lidglow in the menu bar panel to use this. While it’s off, macOS manages the logo.")
+            }
+            .disabled(!model.enabled)
+        } header: {
+            Text("Power")
+        } footer: {
+            Text("With Caffeinate on Screen Timeout, the logo still turns off when your Mac locks, sleeps, or the lid closes. Lidglow doesn’t keep your Mac or the screen awake.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Open at Login, through the system's login item service for the app itself (macOS 13 and later).
+private struct GeneralSection: View {
     @State private var status = SMAppService.mainApp.status
     @State private var failure: String?
 
@@ -257,10 +284,6 @@ private struct GeneralSection: View {
             }
             if let failure {
                 Text(failure).font(.footnote).foregroundStyle(.secondary)
-            }
-            Toggle(isOn: $model.breatheWhileCharging) {
-                Text("Breathe while charging")
-                Text("Every mode breathes while the battery charges, except Music while music plays.")
             }
         }
         // Approval happens in System Settings, so check again when the user comes back.

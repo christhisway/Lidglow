@@ -264,8 +264,17 @@ final class GlowModel: ObservableObject {
     /// the logo keeps breathing, and nothing else (Music's input, an agent's pulse) runs until unlock.
     private var screenLocked = false
     private var displaysAwake = true
+    /// False from `willSleep` until `didWake`. System sleep always hands the logo back to macOS.
+    private var systemAwake = true
+    /// The displays went to sleep while the Mac stayed awake, which is a screen timeout (or the user
+    /// putting the displays to sleep), not system sleep. Cleared when the displays wake or the Mac
+    /// sleeps, so a dark wake after system sleep (Power Nap) never counts as a timeout.
+    private var screenTimedOut = false
     private var hardwareCheck = 0.0
-    private var mayRun = true
+    /// The lid is open, from the last hardware check.
+    private var lidOpen = true
+    /// The built-in display is online, awake, and not asleep, from the last hardware check.
+    private var builtInAwake = true
     private var lastSignal: Double?
     /// When Music last heard sound, for the silence timeout. Cleared whenever the glow pauses, so time
     /// locked, asleep, or with the lid closed doesn't count as silence.
@@ -291,8 +300,8 @@ final class GlowModel: ObservableObject {
         let events: [(NSNotification.Name, Selector)] = [
             (NSWorkspace.screensDidSleepNotification, #selector(screenSleep)),
             (NSWorkspace.screensDidWakeNotification, #selector(screenWake)),
-            (NSWorkspace.willSleepNotification, #selector(screenSleep)),
-            (NSWorkspace.didWakeNotification, #selector(screenWake)),
+            (NSWorkspace.willSleepNotification, #selector(systemSleep)),
+            (NSWorkspace.didWakeNotification, #selector(systemWake)),
             (NSWorkspace.sessionDidResignActiveNotification, #selector(lockSession)),
             (NSWorkspace.sessionDidBecomeActiveNotification, #selector(unlockSession))
         ]
@@ -367,7 +376,7 @@ final class GlowModel: ObservableObject {
         updatePlaybackWatch()
     }
 
-    /// Settings → General → Breathe while charging. On by default. Off, charging never changes the glow
+    /// Settings → Power → Breathe while charging. On by default. Off, charging never changes the glow
     /// and the power source isn't watched.
     @Published var breatheWhileCharging = UserDefaults.standard.object(forKey: "breatheWhileCharging") as? Bool ?? true {
         didSet {
@@ -376,6 +385,32 @@ final class GlowModel: ObservableObject {
             // Hand the glow back to the mode (or, if locked, to macOS) on the next tick, or start the breath.
             chargingChanged()
         }
+    }
+
+    /// Settings → Power → Caffeinate on Screen Timeout. Off by default. With the lid open and the screen
+    /// unlocked, the logo keeps its mode when the displays turn off from inactivity, until the Mac
+    /// sleeps, the lid closes, or the screen locks. Lidglow doesn't keep the Mac or the display awake, so
+    /// macOS's own sleep settings still decide when that happens.
+    @Published var caffeinateOnScreenTimeout = UserDefaults.standard.bool(forKey: "caffeinateOnScreenTimeout") {
+        didSet {
+            UserDefaults.standard.set(caffeinateOnScreenTimeout, forKey: "caffeinateOnScreenTimeout")
+            // Turning it off while the screen is off hands the logo back on the next tick.
+            speedUp()
+        }
+    }
+
+    /// The screen timed out and Caffeinate on Screen Timeout keeps the glow. The panel's switch comes
+    /// first, so an agent's pulse with the switch off doesn't count. A lock, even one that comes with the
+    /// timeout, still hands the logo back, as does switching to another user.
+    private var screenTimeoutGlow: Bool {
+        caffeinateOnScreenTimeout && enabled && screenTimedOut && systemAwake && sessionActive && !screenLocked
+    }
+
+    /// Whether the glow may drive the logo right now. Otherwise the loop pauses with the logo handed back.
+    private var glowAllowed: Bool {
+        guard systemAwake && sessionActive && lidOpen else { return false }
+        guard (displaysAwake && builtInAwake) || screenTimeoutGlow else { return false }
+        return !screenLocked || chargingBreath
     }
 
     /// Charging only changes the glow while Lidglow is on and Breathe while charging is on, so the power
@@ -564,6 +599,9 @@ final class GlowModel: ObservableObject {
     private static let fastTick = 1 / 60.0
     private static let breatheTick = 1 / 30.0
     private static let idleTick = 0.25
+    /// While the screen is off (Caffeinate on Screen Timeout), nobody watches the preview, and a breath
+    /// only needs a tick near each turn, so it slows from 30 Hz to 10 Hz.
+    private static let screenOffBreatheTick = 0.1
     private static let silenceDelay = 2.0
 
     private func schedule(_ interval: Double) {
@@ -576,8 +614,8 @@ final class GlowModel: ObservableObject {
 
     private func scheduleNextTick() {
         guard let timer else { return }
-        let interval: Double
-        if !(displaysAwake && sessionActive && mayRun) || (screenLocked && !chargingBreath) {
+        var interval: Double
+        if !glowAllowed {
             interval = Self.idleTick
         } else if screenLocked || pulseStart != nil {
             interval = Self.breatheTick
@@ -604,6 +642,11 @@ final class GlowModel: ObservableObject {
                 } else {
                     interval = logo.isSettled ? Self.idleTick : Self.fastTick
                 }
+            }
+            // A breath (Breathe's own or a charging breath) with the screen off. An agent's pulse keeps
+            // its rate, because its flashes are short.
+            if interval == Self.breatheTick && pulseStart == nil && !(displaysAwake && builtInAwake) {
+                interval = Self.screenOffBreatheTick
             }
         }
         if abs(timer.timeInterval - interval) > 1e-6 { schedule(interval) }
@@ -643,8 +686,22 @@ final class GlowModel: ObservableObject {
         select(previous)
     }
 
-    @objc private func screenSleep() { displaysAwake = false; pause() }
-    @objc private func screenWake() { displaysAwake = true; hardwareCheck = 0; speedUp() }
+    /// The displays went to sleep. With the Mac awake that's a screen timeout, which Caffeinate on Screen
+    /// Timeout may ride through. Otherwise hand the logo back now.
+    @objc private func screenSleep() {
+        displaysAwake = false
+        screenTimedOut = systemAwake
+        hardwareCheck = 0
+        if screenTimeoutGlow { speedUp() } else { pause() }
+    }
+    @objc private func screenWake() { displaysAwake = true; screenTimedOut = false; hardwareCheck = 0; speedUp() }
+    @objc private func systemSleep() {
+        systemAwake = false
+        displaysAwake = false
+        screenTimedOut = false
+        pause()
+    }
+    @objc private func systemWake() { systemAwake = true; displaysAwake = true; hardwareCheck = 0; speedUp() }
     @objc private func lockSession() { sessionActive = false; pause() }
     @objc private func unlockSession() { sessionActive = true; hardwareCheck = 0; speedUp() }
     @objc private func lockScreen() {
@@ -659,7 +716,8 @@ final class GlowModel: ObservableObject {
         defer { scheduleNextTick() }
         let now = ProcessInfo.processInfo.systemUptime
         if now >= hardwareCheck {
-            mayRun = logo.awake && !logo.bridge.lidClosed
+            lidOpen = !logo.bridge.lidClosed
+            builtInAwake = logo.awake
             hardwareCheck = now + 0.35
         }
         // Checked before the pause below, so a pulse left behind a lock still times out.
@@ -669,7 +727,7 @@ final class GlowModel: ObservableObject {
             // With the switch off, that stopped the loop and handed the logo back to macOS.
             guard shouldRun else { return }
         }
-        guard displaysAwake && sessionActive && mayRun && (!screenLocked || chargingBreath) else {
+        guard glowAllowed else {
             pause()
             publishLevel(0)
             publishStatus("Paused while the lid or screen is inactive")

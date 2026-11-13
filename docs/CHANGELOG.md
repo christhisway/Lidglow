@@ -7,6 +7,10 @@ Each release is also published on [GitHub Releases](https://github.com/christhis
 ### Added
 - A Lidglow app icon, a glowing ribbon, shown in Finder and in permission prompts. On macOS 27 it uses Liquid Glass.
 - A ribbon in the menu bar in place of the waveform circle, filled while Lidglow is on and outlined while it's off. The app icon also heads the panel and Settings → About.
+- **Caffeinate on Screen Timeout** in a new Settings → Power section keeps the logo glowing in its mode while the screen is off from inactivity, until your Mac locks, sleeps, or the lid closes. It's off by default and uses more energy.
+
+### Changed
+- **Breathe while charging** moved from Settings → General to Settings → Power.
 
 ## 0.9.0 Beta 2
 
