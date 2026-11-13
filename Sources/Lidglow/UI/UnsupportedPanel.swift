@@ -12,10 +12,10 @@ struct UnsupportedPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack(spacing: 9) {
-                Image(systemName: "waveform.circle.fill")
-                    .font(.title2)
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.primary)
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
                     .accessibilityHidden(true)
                 Text("Lidglow").font(.headline)
             }

@@ -329,9 +329,10 @@ private struct AboutSection: View {
     var body: some View {
         Section("About") {
             HStack(spacing: 12) {
-                Image(systemName: "waveform.circle.fill")
-                    .font(.largeTitle)
-                    .symbolRenderingMode(.hierarchical)
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 36, height: 36)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Lidglow").font(.headline)

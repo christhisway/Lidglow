@@ -36,7 +36,6 @@ final class GlowModel: ObservableObject {
         if mode == .standard && value < 0.01 { value = 0 }
         brightnessByMode[mode] = value
         UserDefaults.standard.set(value, forKey: Self.brightnessKey(for: mode))
-        updateIcon()
         speedUp()
     }
 
@@ -282,7 +281,6 @@ final class GlowModel: ObservableObject {
             publishLevel(latestLevel)
         }
     }
-    var onIconChange: ((Bool) -> Void)?
     var onRiseFromDark: (() -> Void)? {
         didSet { logo.onRiseFromDark = onRiseFromDark }
     }
@@ -397,7 +395,6 @@ final class GlowModel: ObservableObject {
     }
 
     private func chargingChanged() {
-        updateIcon()
         // Start a borrowed breath from its trough, as Breathe does when it's selected, so it doesn't open
         // partway through a fade.
         if chargingBreath && mode != .breathe { phaseStart = ProcessInfo.processInfo.systemUptime }
@@ -530,7 +527,6 @@ final class GlowModel: ObservableObject {
     }
 
     private func start() {
-        updateIcon()
         audioError = false
         phaseStart = ProcessInfo.processInfo.systemUptime
         hardwareCheck = 0
@@ -560,16 +556,6 @@ final class GlowModel: ObservableObject {
         }
         if timer == nil { schedule(Self.fastTick) }
         tick()
-    }
-
-    /// The menu-bar icon shows an empty circle while Lidglow is holding the logo dark. Brightness drags
-    /// call this on every change, so only touch the status item when the icon actually flips.
-    private var iconLit: Bool?
-    private func updateIcon() {
-        let lit = !enabled || brightness > 0 || chargingBreath
-        guard lit != iconLit else { return }
-        iconLit = lit
-        onIconChange?(lit)
     }
 
     // Music samples audio every tick, so it keeps the full rate while sound is playing. Even a 3 s

@@ -1,0 +1,21 @@
+{
+  "fill": {
+    "solid": "srgb:0.090,0.094,0.110,1.000"
+  },
+  "groups": [
+    {
+      "name": "Lidglow ribbon",
+      "layers": [
+        {
+          "name": "White ribbon",
+          "image-name": "Ribbon.png",
+          "blend-mode": "normal",
+          "glass": true
+        }
+      ]
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

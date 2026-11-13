@@ -7,6 +7,7 @@
     <key>CFBundleDisplayName</key><string>Lidglow</string>
     <key>CFBundleExecutable</key><string>Lidglow</string>
     <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleIconFile</key><string>AppIcon.icns</string>
     <key>CFBundleShortVersionString</key><string>0.9.0</string>
     <key>CFBundleVersion</key><string>3</string>
     <key>LidglowReleaseLabel</key><string>Beta</string>
