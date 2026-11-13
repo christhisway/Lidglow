@@ -272,11 +272,21 @@ final class SystemMusic {
         }
         var meter = BeatMeter(sampleRate: format.sampleRate)
         meter.preset = preset
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-            // The first channel is enough for a level, and works for mono and stereo inputs alike.
-            guard let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
-            let level = meter.process(samples, frames: Int(buffer.frameLength), channels: 1)
-            self?.publish(level, meter: &meter)
+        // macOS 27 deprecates the non-throwing installTap. Its replacement, installTapOnBus:bufferSize:
+        // format:error:block:, is NS_REFINED_FOR_SWIFT with no Swift refinement in the SDK, and its error
+        // parameter isn't last, so Swift imports it as a throwing __installTap with an `error: ()`
+        // placeholder. 1024 frames is below the documented 100–400 ms range, but the system picks the
+        // actual size and a bigger request would make the glow react later to beats.
+        do {
+            try input.__installTap(onBus: 0, bufferSize: 1024, format: format, error: ()) { [weak self] buffer, _ in
+                // The first channel is enough for a level, and works for mono and stereo inputs alike.
+                guard let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
+                let level = meter.process(samples, frames: Int(buffer.frameLength), channels: 1)
+                self?.publish(level, meter: &meter)
+            }
+        } catch {
+            Logger.audio.error("Microphone tap failed: \(error.localizedDescription, privacy: .public)")
+            throw MicrophoneError(errorDescription: "Couldn't listen to the microphone (\(error.localizedDescription)).")
         }
         do {
             try engine.start()
