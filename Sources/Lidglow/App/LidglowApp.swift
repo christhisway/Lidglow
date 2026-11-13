@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import AppKit
+import Combine
 import os
 import SwiftUI
 
@@ -12,6 +13,7 @@ private final class TopAnchoredView: NSView {
 
 final class LidglowApp: NSObject, NSApplicationDelegate {
     private var item: NSStatusItem?
+    private var iconObservation: AnyCancellable?
     /// Created only on a Mac with a light-up logo. Without one, Lidglow stays inert: the panel says so
     /// and offers Quit, and no timer, audio tap, or system observer is ever set up.
     private var model: GlowModel?
@@ -67,12 +69,14 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         status.button?.action = #selector(statusItemClicked)
         // Act on mouse-up for both buttons so a right-click or Control-click can open the context menu.
         status.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        model?.onIconChange = { [weak self] in self?.setIcon(lit: $0) }
+        setIcon(enabled: false)
+        iconObservation = model?.$enabled.removeDuplicates().sink { [weak self] enabled in
+            self?.setIcon(enabled: enabled)
+        }
         model?.onRiseFromDark = { [weak self] in
             guard let button = self?.item?.button else { return }
             button.alphaValue = button.alphaValue == 1 ? 0.98 : 1
         }
-        setIcon(lit: true)
         #if compiler(>=6.4)
         status.expandedInterfaceDelegate = self
         usesMenuBarSession = true
@@ -99,7 +103,7 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    private lazy var menuBarIcons: (lit: NSImage, dimmed: NSImage)? = {
+    private lazy var menuBarIcons: (filled: NSImage, outlined: NSImage)? = {
         func template(named name: String) -> NSImage? {
             guard let url = Bundle.main.url(forResource: name, withExtension: "png"),
                   let image = NSImage(contentsOf: url) else { return nil }
@@ -108,16 +112,16 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
             image.accessibilityDescription = "Lidglow"
             return image
         }
-        guard let lit = template(named: "MenuBarIcon"),
-              let dimmed = template(named: "MenuBarIconOutline") else { return nil }
-        return (lit, dimmed)
+        guard let filled = template(named: "MenuBarIcon"),
+              let outlined = template(named: "MenuBarIconOutline") else { return nil }
+        return (filled, outlined)
     }()
 
-    private func setIcon(lit: Bool) {
+    private func setIcon(enabled: Bool) {
         if let icons = menuBarIcons {
-            item?.button?.image = lit ? icons.lit : icons.dimmed
+            item?.button?.image = enabled ? icons.filled : icons.outlined
         } else {
-            item?.button?.image = NSImage(systemSymbolName: lit ? "waveform.circle" : "circle",
+            item?.button?.image = NSImage(systemSymbolName: enabled ? "waveform.circle" : "circle",
                                           accessibilityDescription: "Lidglow")
         }
         item?.button?.toolTip = "Lidglow"
