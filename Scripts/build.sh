@@ -3,6 +3,7 @@
 # Builds, signs, and verifies Lidglow.app. Usage: Scripts/build.sh [destination]
 # A relative destination is resolved against the repository root. Default: build/Lidglow.app
 set -eu
+set -o pipefail
 cd -- "${0:A:h}/.."
 destination="${1:-build/Lidglow.app}"
 if [[ "$destination" != /* ]]; then destination="$PWD/$destination"; fi
@@ -14,14 +15,16 @@ trap 'rm -rf -- "$cache"' EXIT
 mkdir -p "$destination/Contents/MacOS" "$destination/Contents/Resources"
 cp "$src/Resources/Info.plist" "$destination/Contents/Info.plist"
 resources="$destination/Contents/Resources"
-cp "$src/Resources/MenuBarIcon.png" "$resources/MenuBarIcon.png"
+cp "$src/Resources/MenuBarIcon.png" "$src/Resources/MenuBarIconOutline.png" "$resources/"
 if xcrun --find actool >/dev/null 2>&1; then
     mkdir -p "$cache/IconOutput" "$cache/IconSupport.xcassets"
     printf '%s\n' '{"info":{"author":"xcode","version":1}}' > "$cache/IconSupport.xcassets/Contents.json"
+    # actool can report diagnostics on stdout alongside its generated-file list.
     xcrun actool "$cache/IconSupport.xcassets" "$src/Resources/AppIcon.icon" \
         --compile "$cache/IconOutput" --app-icon AppIcon --platform macosx \
         --target-device mac --minimum-deployment-target 27.0 \
-        --output-partial-info-plist "$cache/IconInfo.plist" --warnings --errors
+        --output-partial-info-plist "$cache/IconInfo.plist" --warnings --errors |
+        awk '/^\/\* com\.apple\.actool\./ { results = /compilation-results/ } !results && NF' >&2
     cp "$cache/IconOutput/Assets.car" "$resources/Assets.car"
     if [[ -f "$cache/IconOutput/AppIcon.icns" ]]; then
         cp "$cache/IconOutput/AppIcon.icns" "$resources/AppIcon.icns"

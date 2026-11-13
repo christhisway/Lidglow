@@ -562,7 +562,7 @@ final class GlowModel: ObservableObject {
         tick()
     }
 
-    /// The menu-bar icon shows an empty circle while Lidglow is holding the logo dark. Brightness drags
+    /// The menu-bar icon shows an outlined ribbon while Lidglow is holding the logo dark. Brightness drags
     /// call this on every change, so only touch the status item when the icon actually flips.
     private var iconLit: Bool?
     private func updateIcon() {

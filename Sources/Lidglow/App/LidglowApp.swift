@@ -100,19 +100,17 @@ final class LidglowApp: NSObject, NSApplicationDelegate {
     }
 
     private lazy var menuBarIcons: (lit: NSImage, dimmed: NSImage)? = {
-        guard let url = Bundle.main.url(forResource: "MenuBarIcon", withExtension: "png"),
-              let source = NSImage(contentsOf: url) else { return nil }
-        let size = NSSize(width: 20, height: 20)
-        func template(opacity: CGFloat) -> NSImage {
-            let image = NSImage(size: size, flipped: false) { rect in
-                source.draw(in: rect, from: .zero, operation: .sourceOver, fraction: opacity)
-                return true
-            }
+        func template(named name: String) -> NSImage? {
+            guard let url = Bundle.main.url(forResource: name, withExtension: "png"),
+                  let image = NSImage(contentsOf: url) else { return nil }
+            image.size = NSSize(width: 20, height: 20)
             image.isTemplate = true
             image.accessibilityDescription = "Lidglow"
             return image
         }
-        return (template(opacity: 1), template(opacity: 0.48))
+        guard let lit = template(named: "MenuBarIcon"),
+              let dimmed = template(named: "MenuBarIconOutline") else { return nil }
+        return (lit, dimmed)
     }()
 
     private func setIcon(lit: Bool) {
