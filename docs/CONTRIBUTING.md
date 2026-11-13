@@ -19,7 +19,7 @@ If Music stays on “Waiting for music” during playback, check that the app yo
 
 ## Build
 
-Install Xcode or the macOS Command Line Tools (`xcode-select --install`), then run `Scripts/build.sh` from the repository root. The script builds, signs, and verifies `build/Lidglow.app` using the Mac's native architecture. Pass a path as the first argument to choose a different destination; relative paths resolve against the repository root. No third-party dependencies are required.
+Install Xcode or the macOS Command Line Tools (`xcode-select --install`), then run `Scripts/build.sh` from the repository root. The script builds, signs, and verifies `build/Lidglow.app` using the Mac's native architecture. Pass a path as the first argument to choose a different destination; relative paths resolve against the repository root. With Xcode, the build compiles the Liquid Glass app icon (`AppIcon.icon`) with `actool`; with only the Command Line Tools, it uses the flat `AppIcon.icns` instead. No third-party dependencies are required.
 
 To run the synthetic beat detector check:
 
@@ -47,7 +47,7 @@ Sources/Lidglow/
   UI/         SwiftUI controls, the panel shown on Macs without a light-up logo, shared Liquid Glass styling, the borderless menu panel, the Settings window and its Agents section, and the animated laptop preview
   Audio/      Core Audio process tap, the playback watcher for automatic switching to Music, and the BeatMeter detector
   Hardware/   Lid logo control, detection of other apps controlling the logo, charging state, laptop finish detection, and the Objective-C CoreBrightness bridge
-  Resources/  Info.plist (including the lidglow URL scheme), AppIcon.icns, and the entitlements used for Developer ID (hardened-runtime) signing
+  Resources/  Info.plist (including the lidglow URL scheme), the app icon (AppIcon.icon, with AppIcon.icns as the fallback), the menu-bar glyphs, and the entitlements used for Developer ID (hardened-runtime) signing
 Tests/BeatMeterTests/  Synthetic beat detector check
 Scripts/      build.sh, test.sh, package.sh (release zip and checksum), install.sh (the Terminal installer, also bundled in the app for Check for Updates), and uninstall.sh (also bundled in the app for Uninstall on Macs without a light-up logo)
 docs/         Architecture notes (behavior, source map, manual checks), the release checklist, the changelog, and the contributing, security, and privacy notes
